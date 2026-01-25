@@ -34,7 +34,7 @@ static struct netdev *netdev_alloc(char *addr, char *hwaddr, uint32_t mtu)
 void netdev_init(char *addr, char *hwaddr)
 {
     loop = netdev_alloc("127.0.0.1", "00:00:00:00:00:00", 1500);
-    netdev = netdev_alloc("10.0.0.4", "00:0c:29:6d:50:25", 1500);
+    netdev = netdev_alloc("10.0.0.5", "00:0c:29:6d:50:25", 1500);
 }
 
 int netdev_transmit(struct sk_buff *skb, uint8_t *dst_hw, uint16_t ethertype)
@@ -62,6 +62,7 @@ int netdev_transmit(struct sk_buff *skb, uint8_t *dst_hw, uint16_t ethertype)
 
 static int netdev_receive(struct sk_buff *skb)
 {
+    printf("Received packet, length: %d\n", skb->len);
     struct eth_hdr *hdr = eth_hdr(skb);
 
     eth_dbg("in", hdr);
@@ -87,12 +88,16 @@ void *netdev_rx_loop()
 {
     while (running) {
         struct sk_buff *skb = alloc_skb(BUFLEN);
+        int nread;
+
+        nread = tun_read((char *)skb->data, BUFLEN);
         
-        if (tun_read((char *)skb->data, BUFLEN) < 0) { 
+        if (nread < 0){
             perror("ERR: Read from tun_fd");
             free_skb(skb);
             return NULL;
         }
+        skb->len = nread;
 
         netdev_receive(skb);
     }
