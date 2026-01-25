@@ -21,10 +21,10 @@ For example, enabling socket-specific output:
 
 Use `tcpdump` with the IP address you're using, e.g.:
 
-    $ tcpdump -i any host 10.0.0.4 -n
-    IP 10.0.0.4.12000 > 10.0.0.5.8000: Flags [S], seq 1525252, win 512, length 0
-    IP 10.0.0.5.8000 > 10.0.0.4.12000: Flags [S.], seq 1332068674, ack 1525253, win 29200, options [mss 1460], length 0
-    IP 10.0.0.4.12000 > 10.0.0.5.8000: Flags [.], ack 1, win 512, length 0
+    $ tcpdump -i any host 10.0.0.5 -n
+    IP 10.0.0.5.12000 > 10.0.0.5.8000: Flags [S], seq 1525252, win 512, length 0
+    IP 10.0.0.5.8000 > 10.0.0.5.12000: Flags [S.], seq 1332068674, ack 1525253, win 29200, options [mss 1460], length 0
+    IP 10.0.0.5.12000 > 10.0.0.5.8000: Flags [.], ack 1, win 512, length 0
 
 Together with the verbose `lvl-ip` output, you can troubleshoot behaviour and spot patterns.
 
@@ -60,7 +60,7 @@ First and foremost, Level-IP aims to be just an introduction to TCP/IP stacks. H
 
 ## Current Features
 
-* One hardcoded interface/netdev (IP 10.0.0.4)
+* One hardcoded interface/netdev (IP 10.0.0.5)
 * One hardcoded socket
 * Ethernet II frame handling
 * ARP request/reply, simple caching
