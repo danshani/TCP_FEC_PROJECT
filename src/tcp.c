@@ -162,7 +162,7 @@ int tcp_v4_connect(struct sock *sk, const struct sockaddr *addr, int addrlen, in
     sk->sport = generate_port();
     sk->daddr = ntohl(daddr);
     /* TODO: Do not hardcode lvl-ip local interface */
-    sk->saddr = parse_ipv4_string("10.0.0.4"); 
+    sk->saddr = parse_ipv4_string("10.0.0.5"); 
 
     return tcp_connect(sk);
 }
@@ -244,12 +244,7 @@ out:
 
 int tcp_recv_notify(struct sock *sk)
 {
-    if (&(sk->recv_wait)) {
-        return wait_wakeup(&sk->recv_wait);
-    }
-
-    // No recv wait lock
-    return -1;
+    return wait_wakeup(&sk->recv_wait);
 }
 
 int tcp_close(struct sock *sk)
