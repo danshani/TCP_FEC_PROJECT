@@ -39,7 +39,7 @@ An example from my (Arch) Linux machine, where `wlp2s0` is my outgoing interface
     $ iptables -I FORWARD --in-interface wlp2s0 --out-interface tap0 -j ACCEPT
     $ iptables -I FORWARD --in-interface tap0 --out-interface wlp2s0 -j ACCEPT
 
-Now, packets coming from `lvl-ip` (10.0.0.4/24 in this case) should be NATed by the host Linux interfaces and traverse the FORWARD chain correctly to the host's outgoing gateway.
+Now, packets coming from `lvl-ip` (10.0.0.5/24 in this case) should be NATed by the host Linux interfaces and traverse the FORWARD chain correctly to the host's outgoing gateway.
 
 See http://www.netfilter.org/documentation/HOWTO/packet-filtering-HOWTO-9.html for more info.
 
