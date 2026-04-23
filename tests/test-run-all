@@ -16,6 +16,8 @@ sleep 5 # wait for stack to establish itself
 
 pids=""
 
+# Ensure reruns are idempotent: clear any existing root qdisc first.
+tc qdisc del dev tap0 root 2>/dev/null || true
 tc qdisc add dev tap0 root handle 1: htb
 
 ./suites/arp/suite-arp &
