@@ -14,4 +14,8 @@ Or a specific test-suite
 
     ./suites/arp/suite-arp
 
+FEC algorithm suite (deterministic + randomized cases)
+
+    ./suites/fec/suite-fec
+
 Root privileges are required.
