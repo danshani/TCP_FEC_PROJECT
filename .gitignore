@@ -6,3 +6,9 @@ a.out
 lvl-ip
 tests/venv
 vgcore*
+build/fec-selftest
+build/fec-codec-selftest
+apps/curl/curl
+apps/curl-poll/curl-poll
+tools/liblevelip.so
+lvl-ip-test.log
