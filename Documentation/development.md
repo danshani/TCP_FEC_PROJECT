@@ -86,3 +86,36 @@ First and foremost, Level-IP aims to be just an introduction to TCP/IP stacks. H
 * Raw Socket (for arping, ping..)
 * 'select' socket API call
 * ...
+
+## FEC Module (GF(256) Polynomial)
+
+An erasure-recovery FEC module is available via [include/fec.h](include/fec.h) and [src/fec.c](src/fec.c).
+
+For a full algorithm walkthrough, see [Documentation/fec-algorithm.md](fec-algorithm.md).
+
+The design follows the original polynomial-evaluation view:
+
+* Source packets are treated as coefficients $a_0..a_{k-1}$ of $P(x)=\sum_{i=0}^{k-1} a_i x^i$.
+* A redundant packet is generated as one extra evaluation point $P(x_r)$ over GF(256).
+* If one source packet is lost, it is recovered from the surviving coefficients and $P(x_r)$.
+* Full interpolation from arbitrary points is provided to reconstruct all coefficients.
+
+All arithmetic is over GF(256) using log/exp lookup tables (primitive polynomial 0x11d).
+
+### API
+
+* `fec_rs_init()` initializes GF(256) tables.
+* `fec_poly_encode_redundant()` generates one redundant packet at chosen `x_r`.
+* `fec_poly_recover_missing_coefficient()` recovers one missing source coefficient packet.
+* `fec_poly_interpolate_coefficients()` reconstructs coefficient packets from $k$ points.
+
+### Quick Verification
+
+Run:
+
+    make fec-test
+
+This builds and executes [tests/fec-selftest.c](tests/fec-selftest.c), which checks:
+
+* Single missing-packet recovery from one redundant packet.
+* Full coefficient reconstruction by interpolation from four GF(256) points.
