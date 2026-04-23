@@ -31,10 +31,21 @@ static int tun_alloc(char *dev)
     struct ifreq ifr;
     int fd, err;
 
-    if( (fd = open("/dev/net/tap", O_RDWR)) < 0 ) {
+    /* Use the standard Linux TUN/TAP clone device path first. */
+    fd = open("/dev/net/tun", O_RDWR);
+
+    /* Fallback for legacy/custom setups that still expose /dev/net/tap. */
+    if (fd < 0) {
+        fd = open("/dev/net/tap", O_RDWR);
+    }
+
+    if (fd < 0) {
         perror("Cannot open TUN/TAP dev\n"
-                    "Make sure one exists with " 
-                    "'$ mknod /dev/net/tap c 10 200'");
+               "Expected /dev/net/tun (or legacy /dev/net/tap).\n"
+               "Try: sudo modprobe tun\n"
+               "Then, if needed:\n"
+               "  sudo mkdir -p /dev/net\n"
+               "  sudo mknod /dev/net/tun c 10 200");
         exit(1);
     }
 
@@ -73,6 +84,9 @@ int tun_write(char *buf, int len)
 void tun_init()
 {
     dev = calloc(10, 1);
+
+    /* Tests and host setup expect the stack to use tap0 explicitly. */
+    strncpy(dev, "tap0", 9);
     tun_fd = tun_alloc(dev);
 
     if (set_if_up(dev) != 0) {
