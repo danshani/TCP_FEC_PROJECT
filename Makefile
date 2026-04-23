@@ -41,4 +41,4 @@ test: debug apps
 	cd tests && ./test-run-all
 
 clean:
-	rm build/*.o lvl-ip
+	rm -f build/*.o build/fec-selftest build/fec-codec-selftest lvl-ip
