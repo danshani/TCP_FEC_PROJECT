@@ -42,3 +42,8 @@ test: debug apps
 
 clean:
 	rm -f build/*.o build/fec-selftest build/fec-codec-selftest lvl-ip
+
+fec-test: tests/fec-selftest.c src/fec.c include/fec.h
+	# Build and run the standalone GF(256) polynomial FEC self-test.
+	$(CC) $(CFLAGS) $(CPPFLAGS) tests/fec-selftest.c src/fec.c -o build/fec-selftest
+	./build/fec-selftest
