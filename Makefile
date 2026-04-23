@@ -33,8 +33,10 @@ all: lvl-ip apps
 test: debug apps
 	@echo
 	@echo "Networking capabilites are required for test dependencies:"
-	which arping | sudo xargs setcap cap_net_raw=ep
-	which tc | sudo xargs setcap cap_net_admin=ep
+	@command -v arping >/dev/null || { echo "Missing dependency: arping (install: sudo apt install iputils-arping)"; exit 1; }
+	@command -v tc >/dev/null || { echo "Missing dependency: tc (install: sudo apt install iproute2)"; exit 1; }
+	@sudo setcap cap_net_raw=ep "$$(command -v arping)"
+	@sudo setcap cap_net_admin=ep "$$(command -v tc)"
 	@echo
 	cd tests && ./test-run-all
 
