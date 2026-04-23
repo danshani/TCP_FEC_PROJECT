@@ -47,3 +47,8 @@ fec-test: tests/fec-selftest.c src/fec.c include/fec.h
 	# Build and run the standalone GF(256) polynomial FEC self-test.
 	$(CC) $(CFLAGS) $(CPPFLAGS) tests/fec-selftest.c src/fec.c -o build/fec-selftest
 	./build/fec-selftest
+
+fec-codec-test: tests/fec-codec-selftest.c src/fec_codec.c src/fec.c include/fec_codec.h include/fec.h
+	# Build and run the FEC codec (encoder/decoder) self-test.
+	$(CC) $(CFLAGS) $(CPPFLAGS) tests/fec-codec-selftest.c src/fec_codec.c src/fec.c -o build/fec-codec-selftest
+	./build/fec-codec-selftest
