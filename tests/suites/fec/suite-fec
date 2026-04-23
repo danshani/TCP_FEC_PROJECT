@@ -1,0 +1,41 @@
+#!/bin/bash
+
+set -eu
+
+source "$(dirname $0)/../../utils/common"
+
+function test_fec_base {
+    make -C "$repo" fec-test >/dev/null
+}
+
+function test_fec_random_seed_1 {
+    "$repo/build/fec-selftest" --random 400 --seed 1 >/dev/null
+}
+
+function test_fec_random_seed_7 {
+    "$repo/build/fec-selftest" --random 400 --seed 7 >/dev/null
+}
+
+function test_fec_random_seed_99 {
+    "$repo/build/fec-selftest" --random 400 --seed 99 >/dev/null
+}
+
+function test_fec_codec_base {
+    make -C "$repo" fec-codec-test >/dev/null
+}
+
+function test_fec_codec_random_seed_1 {
+    "$repo/build/fec-codec-selftest" --random 300 --seed 1 >/dev/null
+}
+
+function test_fec_codec_random_seed_42 {
+    "$repo/build/fec-codec-selftest" --random 300 --seed 42 >/dev/null
+}
+
+test_run "test_fec_base" "$0"
+test_run "test_fec_random_seed_1" "$0"
+test_run "test_fec_random_seed_7" "$0"
+test_run "test_fec_random_seed_99" "$0"
+test_run "test_fec_codec_base" "$0"
+test_run "test_fec_codec_random_seed_1" "$0"
+test_run "test_fec_codec_random_seed_42" "$0"
