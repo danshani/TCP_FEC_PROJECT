@@ -49,7 +49,10 @@ static void tcp_init_segment(struct tcphdr *th, struct iphdr *ih, struct sk_buff
     skb->dlen = ip_len(ih) - tcp_hlen(th);
     skb->len = skb->dlen + th->syn + th->fin;
     skb->end_seq = skb->seq + skb->dlen;
-    skb->payload = th->data;
+    /* Payload begins after any TCP options, not at the start of the option
+     * area. With no options this is th->data; with options (e.g. the FEC tag)
+     * it skips them so delivered stream bytes stay aligned. */
+    skb->payload = th->data + (tcp_hlen(th) - TCP_HDR_LEN);
 }
 
 static void tcp_clear_queues(struct tcp_sock *tsk) {
