@@ -31,7 +31,7 @@ static struct netdev *netdev_alloc(char *addr, char *hwaddr, uint32_t mtu)
     return dev;
 }
 
-void netdev_init(char *addr, char *hwaddr)
+void netdev_init(void)
 {
     loop = netdev_alloc("127.0.0.1", "00:00:00:00:00:00", 1500);
     netdev = netdev_alloc("10.0.0.5", "00:0c:29:6d:50:25", 1500);
@@ -84,7 +84,7 @@ static int netdev_receive(struct sk_buff *skb)
     return 0;
 }
 
-void *netdev_rx_loop()
+void *netdev_rx_loop(void *arg)
 {
     while (running) {
         struct sk_buff *skb = alloc_skb(BUFLEN);
