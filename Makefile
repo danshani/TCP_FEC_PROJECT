@@ -41,7 +41,7 @@ test: debug apps
 	cd tests && ./test-run-all
 
 clean:
-	rm -f build/*.o build/fec-selftest build/fec-codec-selftest build/handshake-selftest lvl-ip
+	rm -f build/*.o build/fec-selftest build/fec-codec-selftest build/handshake-selftest build/fec-receiver-selftest lvl-ip
 
 fec-test: tests/fec-selftest.c src/fec.c include/fec.h
 	# Build and run the standalone GF(256) polynomial FEC self-test.
@@ -57,3 +57,8 @@ handshake-test: tests/handshake-wireformat-selftest.c include/fec_frame.h includ
 	# Build and run the FEC handshake wire-format self-test.
 	$(CC) $(CFLAGS) $(CPPFLAGS) tests/handshake-wireformat-selftest.c -o build/handshake-selftest
 	./build/handshake-selftest
+
+fec-receiver-test: tests/fec-receiver-selftest.c src/fec_codec.c src/fec.c include/fec_codec.h include/fec.h
+	# Build and run the receiver-side recovery self-test.
+	$(CC) $(CFLAGS) $(CPPFLAGS) tests/fec-receiver-selftest.c src/fec_codec.c src/fec.c -o build/fec-receiver-selftest
+	./build/fec-receiver-selftest

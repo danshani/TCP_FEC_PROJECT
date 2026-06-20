@@ -564,7 +564,8 @@ void tcp_fec_release(struct tcp_sock *tsk)
     if (!tsk || !tsk->fec) return;
     free(tsk->fec->tx_src_buf);
     free(tsk->fec->tx_repair_buf);
-    /* RX symbol_buf[] is owned/freed by the receiver path (not yet present). */
+    for (int i = 0; i < TCP_FEC_RX_BLOCKS; i++)
+        free(tsk->fec->rx[i].symbol_buf);
     free(tsk->fec);
     tsk->fec = NULL;
 }
