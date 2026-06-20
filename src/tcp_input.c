@@ -242,6 +242,9 @@ static int tcp_synsent(struct tcp_sock *tsk, struct sk_buff *skb, struct tcphdr 
     } else {
         tcp_set_state(sk, TCP_SYN_RECEIVED);
         tcb->snd_una = tcb->iss;
+        /* Resolve MSS/SACK/FEC from the peer's SYN before replying, so the
+         * SYN/ACK echoes FEC-PERM only if the peer actually offered it. */
+        tcp_parse_opts(tsk, th);
         tcp_send_synack(&tsk->sk);
     }
     

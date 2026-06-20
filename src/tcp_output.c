@@ -54,6 +54,10 @@ static int tcp_write_syn_options(struct tcphdr *th, struct tcp_options *opts, in
         th->data[i++] = TCP_OPTLEN_SACK;
     }
 
+    /* Pad any remaining bytes up to the 4-byte-aligned optlen with NOPs, so
+     * the data offset (optlen/4) exactly covers what we wrote. */
+    while ((int) i < optlen) th->data[i++] = TCP_OPT_NOOP;
+
     th->hl = TCP_DOFFSET + (optlen / 4);
 
     return 0;
@@ -81,6 +85,17 @@ static int tcp_syn_options(struct sock *sk, struct tcp_options *opts)
     } else {
         opts->fec = 0;
     }
+
+    /* The option area cannot exceed TCP_OPT_MAX (40) bytes. FEC-PERM is the
+     * least essential, so drop it first if the total would overflow. With
+     * MSS(4) + SACK(4) + FEC(8) = 16 this is purely defensive. */
+    if (optlen > TCP_OPT_MAX && opts->fec) {
+        opts->fec = 0;
+        optlen -= TCP_OPTLEN_FEC_PERM;
+    }
+
+    /* Options must be 4-byte aligned (NOP padding is written by the builder). */
+    while (optlen % 4 != 0) optlen++;
 
     return optlen;
 }
@@ -193,11 +208,24 @@ int tcp_send_synack(struct sock *sk)
 
     struct sk_buff *skb;
     struct tcphdr *th;
-    struct tcb * tcb = &tcp_sk(sk)->tcb;
+    struct tcb *tcb = &tcp_sk(sk)->tcb;
+    struct tcp_options opts = { 0 };
+    int optlen = 0;
     int rc = 0;
 
-    skb = tcp_alloc_skb(0, 0);
+    /*
+     * Emit MSS + (SACK-OK) + (FEC-PERM) options on the SYN/ACK. opts->sack and
+     * opts->fec are driven by tsk->sackok / tsk->fecok, which the caller has
+     * already resolved by parsing the incoming SYN (tcp_parse_opts). Hence
+     * FEC-PERM is echoed only if the peer offered it with matching geometry.
+     * tcp_syn_options also caps the total at TCP_OPT_MAX and 4-byte-aligns it.
+     */
+    optlen = tcp_syn_options(sk, &opts);
+
+    skb = tcp_alloc_skb(optlen, 0);
     th = tcp_hdr(skb);
+
+    tcp_write_syn_options(th, &opts, optlen);
 
     th->syn = 1;
     th->ack = 1;

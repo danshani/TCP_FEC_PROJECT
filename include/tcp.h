@@ -30,6 +30,9 @@
 #define TCP_OPTLEN_SACK 2
 #define TCP_OPT_TS 8
 
+/* Max TCP option bytes: data offset is 4 bits → 60-byte header − 20 fixed. */
+#define TCP_OPT_MAX 40
+
 #define TCP_2MSL 60000
 #define TCP_USER_TIMEOUT 180000
 
