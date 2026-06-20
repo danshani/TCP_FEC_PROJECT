@@ -11,7 +11,8 @@ static int tcp_parse_opts(struct tcp_sock *tsk, struct tcphdr *th)
     struct tcp_opt_mss *opt_mss = NULL;
     uint8_t sack_seen = 0;
     uint8_t tsopt_seen = 0;
-    
+    uint8_t fec_seen = 0;
+
     while (optlen > 0 && optlen < 20) {
         switch (*ptr) {
         case TCP_OPT_MSS:
@@ -37,6 +38,30 @@ static int tcp_parse_opts(struct tcp_sock *tsk, struct tcphdr *th)
             tsopt_seen = 1;
             optlen--;
             break;
+        case TCP_OPT_FEC_PERM: {
+            struct tcp_opt_fec_perm *fp = (struct tcp_opt_fec_perm *) ptr;
+
+            /* Bounds: the full 8-byte option must lie within the option area.
+             * If not, the option stream is malformed — stop parsing. */
+            if (optlen < TCP_OPTLEN_FEC_PERM) {
+                optlen = 0;
+                break;
+            }
+
+            /* Engage only on EXACT geometry agreement (version, k, r, sym_len).
+             * Any mismatch leaves fec_seen = 0 ⇒ FEC stays off (never corrupts;
+             * worst case is plain TCP). */
+            if (fp->version == FEC_WIRE_VERSION &&
+                fp->k == TCP_FEC_DEFAULT_K &&
+                fp->r == TCP_FEC_DEFAULT_R &&
+                ntohs(fp->sym_len) == TCP_FEC_DEFAULT_SYM_LEN) {
+                fec_seen = 1;
+            }
+
+            ptr += TCP_OPTLEN_FEC_PERM;
+            optlen -= TCP_OPTLEN_FEC_PERM;
+            break;
+        }
         default:
             print_err("Unrecognized TCPOPT\n");
             optlen--;
@@ -54,6 +79,13 @@ static int tcp_parse_opts(struct tcp_sock *tsk, struct tcphdr *th)
         else tsk->sacks_allowed = 4;
     } else {
         tsk->sackok = 0;
+    }
+
+    /* FEC engages only if we offered it AND the peer agreed on geometry. */
+    if (fec_seen && tsk->fecok) {
+        tsk->fecok = 1;
+    } else {
+        tsk->fecok = 0;
     }
 
     return 0;
@@ -197,6 +229,15 @@ static int tcp_synsent(struct tcp_sock *tsk, struct sk_buff *skb, struct tcphdr 
         tcp_send_ack(&tsk->sk);
         tcp_rearm_user_timeout(&tsk->sk);
         tcp_parse_opts(tsk, th);
+
+        /* Negotiation resolved: allocate codec state if both sides agreed. */
+        if (tsk->fecok) {
+            if (tcp_fec_enable(tsk) != 0) {
+                tsk->fecok = 0;   /* alloc/geometry failure ⇒ fall back to TCP */
+                print_err("FEC: enable failed; continuing without FEC\n");
+            }
+        }
+
         sock_connected(sk);
     } else {
         tcp_set_state(sk, TCP_SYN_RECEIVED);

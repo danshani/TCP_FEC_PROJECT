@@ -30,7 +30,9 @@ struct net_ops tcp_ops = {
 
 void tcp_init()
 {
-    
+    /* Build the shared GF(256) tables used by all FEC-enabled connections. */
+    if (tcp_fec_init_shared() != 0)
+        print_err("FEC: GF(256) table init failed; FEC disabled\n");
 }
 
 static void tcp_init_segment(struct tcphdr *th, struct iphdr *ih, struct sk_buff *skb)
@@ -102,13 +104,14 @@ int tcp_v4_checksum(struct sk_buff *skb, uint32_t saddr, uint32_t daddr)
     return tcp_udp_checksum(saddr, daddr, IP_TCP, skb->data, skb->len);
 }
 
-struct sock *tcp_alloc_sock()
+struct sock *tcp_alloc_sock(int protocol)
 {
     struct tcp_sock *tsk = malloc(sizeof(struct tcp_sock));
 
     memset(tsk, 0, sizeof(struct tcp_sock));
     tsk->sk.state = TCP_CLOSE;
     tsk->sackok = 1;
+    tsk->fecok = 1;     /* offer FEC; cleared on parse if peer doesn't agree */
     
     tsk->rmss = 1460;
     // Default to 536 as per spec
@@ -296,6 +299,7 @@ static int tcp_free(struct sock *sk)
 
     tcp_clear_timers(sk);
     tcp_clear_queues(tsk);
+    tcp_fec_release(tsk);
 
     wait_wakeup(&sk->sock->sleep);
 

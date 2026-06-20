@@ -4,6 +4,7 @@
 #include "ip.h"
 #include "timer.h"
 #include "utils.h"
+#include "fec_frame.h"
 
 #define TCP_HDR_LEN sizeof(struct tcphdr)
 #define TCP_DOFFSET sizeof(struct tcphdr) / 4
@@ -125,6 +126,7 @@ struct tcp_options {
     uint16_t options;
     uint16_t mss;
     uint8_t sack;
+    uint8_t fec;        /* advertise FEC-permitted in this SYN */
 };
 
 struct tcp_opt_mss {
@@ -191,6 +193,42 @@ struct tcp_sack_block {
     uint32_t right;
 } __attribute__((packed));
 
+/* ---- FEC per-connection state --------------------------------------- *
+ * Concurrent in-flight decode contexts: a lost source symbol must be
+ * recoverable while later blocks are already arriving, so the receiver keeps
+ * a small ring of active blocks keyed by block_id. */
+#define TCP_FEC_RX_BLOCKS 4
+
+struct tcp_fec_block_rx {
+    uint8_t            active;
+    uint32_t           block_id;
+    uint32_t           base_seq;
+    uint16_t           tail_len;
+    struct fec_decoder dec;
+    uint8_t           *symbol_buf;   /* (k+r)*sym_len staging+recovery (lazy) */
+};
+
+struct tcp_fec {
+    /* negotiated geometry (immutable once ESTABLISHED) */
+    uint8_t  k;
+    uint8_t  r;
+    uint16_t sym_len;
+
+    const struct fec_rs_ctx *ctx;    /* shared GF(256) tables */
+
+    /* TX side — current outbound block */
+    uint32_t tx_block_id;
+    uint32_t tx_base_seq;            /* seq of source symbol 0 */
+    uint8_t  tx_filled;             /* source symbols staged so far */
+    uint16_t tx_tail_len;          /* real byte length of last staged symbol */
+    struct fec_encoder enc;
+    uint8_t *tx_src_buf;            /* k*sym_len source staging  (lazy) */
+    uint8_t *tx_repair_buf;        /* r*sym_len generated parity (lazy) */
+
+    /* RX side (populated by the receiver path) */
+    struct tcp_fec_block_rx rx[TCP_FEC_RX_BLOCKS];
+};
+
 struct tcp_sock {
     struct sock sk;
     int fd;
@@ -217,7 +255,10 @@ struct tcp_sock {
     struct tcp_sack_block sacks[4];
 
     uint8_t tsopt;
-    
+
+    uint8_t fecok;            /* peer advertised FEC-permitted (handshake) */
+    struct tcp_fec *fec;      /* allocated iff FEC negotiated; else NULL    */
+
     struct sk_buff_head ofo_queue; /* Out-of-order queue */
 };
 
@@ -232,7 +273,7 @@ int tcp_checksum(struct tcp_sock *sock, struct tcphdr *thdr);
 void tcp_select_initial_window(uint32_t *rcv_wnd);
 
 int generate_iss();
-struct sock *tcp_alloc_sock();
+struct sock *tcp_alloc_sock(int protocol);
 int tcp_v4_init_sock(struct sock *sk);
 int tcp_init_sock(struct sock *sk);
 void __tcp_set_state(struct sock *sk, uint32_t state);
@@ -268,5 +309,10 @@ void tcp_stop_delack_timer(struct tcp_sock *tsk);
 void tcp_release_delack_timer(struct tcp_sock *tsk);
 void tcp_rearm_user_timeout(struct sock *sk);
 int tcp_calculate_sacks(struct tcp_sock *tsk);
+
+int  tcp_fec_init_shared(void);
+int  tcp_fec_enable(struct tcp_sock *tsk);
+void tcp_fec_release(struct tcp_sock *tsk);
+int  tcp_fec_flush(struct tcp_sock *tsk);
 
 #endif

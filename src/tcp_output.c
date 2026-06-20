@@ -4,6 +4,7 @@
 #include "ip.h"
 #include "skbuff.h"
 #include "timer.h"
+#include "fec_frame.h"
 
 static void *tcp_retransmission_timeout(void *arg);
 
@@ -30,6 +31,21 @@ static int tcp_write_syn_options(struct tcphdr *th, struct tcp_options *opts, in
     opt_mss->mss = htons(opts->mss);
 
     i += sizeof(struct tcp_opt_mss);
+
+    /* FEC-permitted is written BEFORE the SACK option: the existing SACK_OK
+     * parse case does not advance the option pointer, so any option after it
+     * would be shadowed. Placing FEC first keeps it parseable. */
+    if (opts->fec) {
+        struct tcp_opt_fec_perm *fp = (struct tcp_opt_fec_perm *) &th->data[i];
+        fp->kind    = TCP_OPT_FEC_PERM;
+        fp->len     = TCP_OPTLEN_FEC_PERM;
+        fp->version = FEC_WIRE_VERSION;
+        fp->k       = TCP_FEC_DEFAULT_K;
+        fp->r       = TCP_FEC_DEFAULT_R;
+        fp->flags   = 0;
+        fp->sym_len = htons(TCP_FEC_DEFAULT_SYM_LEN);
+        i += TCP_OPTLEN_FEC_PERM;
+    }
 
     if (opts->sack) {
         th->data[i++] = TCP_OPT_NOOP;
@@ -58,13 +74,26 @@ static int tcp_syn_options(struct sock *sk, struct tcp_options *opts)
     } else {
         opts->sack = 0;
     }
-    
+
+    if (tsk->fecok) {
+        opts->fec = 1;
+        optlen += TCP_OPTLEN_FEC_PERM;   /* 8 bytes, already 4-byte aligned */
+    } else {
+        opts->fec = 0;
+    }
+
     return optlen;
 }
 
 static int tcp_write_options(struct tcp_sock *tsk, struct tcphdr *th)
 {
     uint8_t *ptr = th->data;
+
+    /* FEC source/repair segments pre-write their 8-byte option at build time
+     * as the first (and only) option. The send path must not overwrite it;
+     * SACK is never combined with FEC on the sender data path. The option
+     * area is zero-filled at alloc, so data[0] is TCP_OPT_FEC iff we wrote one. */
+    if (th->data[0] == TCP_OPT_FEC) return 0;
 
     if (!tsk->sackok || tsk->sacks[0].left == 0) return 0;
 
@@ -442,38 +471,276 @@ int tcp_connect(struct sock *sk)
     return rc;
 }
 
+/* ============================================================= *
+ *  FEC transmit path (Priority #1)                              *
+ * ============================================================= */
+
+/* GF(256) tables are read-only after init and identical for every
+ * connection, so they are built once and shared by pointer. */
+static struct fec_rs_ctx fec_shared_ctx;
+static int fec_shared_ready = 0;
+
+int tcp_fec_init_shared(void)
+{
+    if (fec_shared_ready) return 0;
+    if (fec_rs_init(&fec_shared_ctx) != 0) return -1;
+    fec_shared_ready = 1;
+    return 0;
+}
+
+/* Allocate per-connection FEC state. Idempotent. */
+int tcp_fec_enable(struct tcp_sock *tsk)
+{
+    struct tcp_fec *fec;
+    uint8_t  k = TCP_FEC_DEFAULT_K;
+    uint8_t  r = TCP_FEC_DEFAULT_R;
+    uint16_t sym_len = TCP_FEC_DEFAULT_SYM_LEN;
+
+    if (!tsk || !fec_shared_ready) return -1;
+    if (tsk->fec) return 0;                       /* already enabled */
+
+    if (k == 0 || k > FEC_BLK_MAX_K) return -1;
+    if (r == 0 || r > FEC_BLK_MAX_R) return -1;
+    if ((int)k + (int)r > 255)       return -1;
+    if (sym_len == 0)                return -1;
+
+    fec = calloc(1, sizeof(*fec));
+    if (!fec) return -1;
+
+    fec->k = k;
+    fec->r = r;
+    fec->sym_len = sym_len;
+    fec->ctx = &fec_shared_ctx;
+
+    /* Lazily-sized staging buffers (Priority #2 will pool these). */
+    fec->tx_src_buf    = calloc((size_t)k, sym_len);
+    fec->tx_repair_buf = calloc((size_t)r, sym_len);
+    if (!fec->tx_src_buf || !fec->tx_repair_buf) goto fail;
+
+    if (fec_encoder_init(&fec->enc, fec->ctx, k, r, sym_len, NULL) != 0)
+        goto fail;
+
+    tsk->fec = fec;
+    return 0;
+
+fail:
+    free(fec->tx_src_buf);
+    free(fec->tx_repair_buf);
+    free(fec);
+    return -1;
+}
+
+/* Free per-connection FEC state. */
+void tcp_fec_release(struct tcp_sock *tsk)
+{
+    if (!tsk || !tsk->fec) return;
+    free(tsk->fec->tx_src_buf);
+    free(tsk->fec->tx_repair_buf);
+    /* RX symbol_buf[] is owned/freed by the receiver path (not yet present). */
+    free(tsk->fec);
+    tsk->fec = NULL;
+}
+
+/* Write the 8-byte per-symbol FEC option at offset 0 of the option area. */
+static void tcp_write_fec_option(struct tcphdr *th, uint8_t type,
+                                 uint8_t index, uint32_t block_id)
+{
+    struct tcp_opt_fec *opt = (struct tcp_opt_fec *) th->data;
+    opt->kind     = TCP_OPT_FEC;
+    opt->len      = TCP_OPTLEN_FEC;
+    opt->type     = type;
+    opt->index    = index;
+    opt->block_id = htonl(block_id);
+}
+
+/* Build and transmit ONE out-of-band repair segment:
+ *   [FEC REPAIR option][fec_repair_hdr][sym_len parity bytes]
+ * Sent directly via tcp_transmit_skb — never queued, never advances snd_nxt,
+ * never retransmitted. Caller holds the socket write lock. */
+static int tcp_fec_send_repair(struct sock *sk, struct tcp_fec *fec,
+                               uint8_t blk_k, uint8_t repair_index,
+                               uint16_t tail_len, const uint8_t *parity)
+{
+    struct tcp_sock *tsk = tcp_sk(sk);
+    struct sk_buff  *skb;
+    struct tcphdr   *th;
+    struct fec_repair_hdr *rh;
+    int payload = (int)sizeof(struct fec_repair_hdr) + (int)fec->sym_len;
+    int rc;
+
+    skb = tcp_alloc_skb(TCP_OPTLEN_FEC, payload);
+    th  = tcp_hdr(skb);
+
+    /* Option first (build time), so tcp_write_options leaves it intact. */
+    tcp_write_fec_option(th, FEC_SYM_REPAIR, repair_index, fec->tx_block_id);
+    th->hl  = TCP_DOFFSET + (TCP_OPTLEN_FEC / 4);
+    th->ack = 1;
+
+    /* Reveal the payload region and fill header + parity. */
+    skb_push(skb, payload);
+    rh = (struct fec_repair_hdr *) skb->data;
+    rh->version      = FEC_WIRE_VERSION;
+    rh->k            = blk_k;
+    rh->r            = fec->r;
+    rh->repair_index = repair_index;
+    rh->block_id     = htonl(fec->tx_block_id);
+    rh->base_seq     = htonl(fec->tx_base_seq);
+    rh->sym_len      = htons(fec->sym_len);
+    rh->tail_len     = htons(tail_len);
+    memcpy(skb->data + sizeof(struct fec_repair_hdr), parity, fec->sym_len);
+
+    /* Stamp current snd_nxt as a reference only; DO NOT advance it. */
+    rc = tcp_transmit_skb(sk, skb, tsk->tcb.snd_nxt);
+    free_skb(skb);
+    return rc;
+}
+
+/* Generate parity for the current block (full k, or short k'=blk_k) and emit
+ * r repair segments, then reset for the next block. The source pointers are
+ * already collected in fec->enc.src[0..blk_k-1]. Caller holds the write lock. */
+static int tcp_fec_emit_block(struct sock *sk, struct tcp_fec *fec,
+                              uint8_t blk_k, uint16_t tail_len)
+{
+    uint8_t *red_ptrs[FEC_BLK_MAX_R];
+    struct fec_encoder tmp;
+    const struct fec_encoder *enc;
+
+    if (blk_k == 0)      return 0;       /* nothing staged */
+    if (blk_k > fec->k)  return -1;      /* bounds guard   */
+
+    for (int j = 0; j < fec->r; j++)
+        red_ptrs[j] = fec->tx_repair_buf + (size_t)j * fec->sym_len;
+
+    if (blk_k == fec->k) {
+        enc = &fec->enc;                 /* full block */
+    } else {
+        /* Short final block: re-encode with k' = blk_k, reusing the source
+         * pointers already gathered (no re-copy). */
+        if (fec_encoder_init(&tmp, fec->ctx, blk_k, fec->r,
+                             fec->sym_len, NULL) != 0)
+            return -1;
+        for (int i = 0; i < blk_k; i++)
+            if (fec_encoder_add_source(&tmp, fec->enc.src[i]) != 0)
+                return -1;
+        enc = &tmp;
+    }
+
+    if (fec_encoder_generate(enc, red_ptrs) != 0)
+        return -1;
+
+    for (uint8_t j = 0; j < fec->r; j++)
+        if (tcp_fec_send_repair(sk, fec, blk_k, j, tail_len,
+                                fec->tx_repair_buf + (size_t)j * fec->sym_len) != 0)
+            return -1;
+
+    fec->tx_block_id++;
+    fec->tx_filled = 0;
+    fec_encoder_reset(&fec->enc);
+    return 0;
+}
+
+/* Flush a partial in-progress block (stream terminating or paused). No-op if
+ * no block in progress. Caller MUST hold the socket write lock. */
+int tcp_fec_flush(struct tcp_sock *tsk)
+{
+    struct tcp_fec *fec = tsk ? tsk->fec : NULL;
+
+    if (!fec || fec->tx_filled == 0) return 0;
+    return tcp_fec_emit_block(&tsk->sk, fec, fec->tx_filled, fec->tx_tail_len);
+}
+
 int tcp_send(struct tcp_sock *tsk, const void *buf, int len)
 {
     struct sk_buff *skb;
     struct tcphdr *th;
     int slen = len;
-    int mss = tsk->smss;
+    struct tcp_fec *fec = tsk->fec;                  /* NULL ⇒ FEC not negotiated */
+    int mss = fec ? (int) fec->sym_len : tsk->smss;  /* FEC: one segment = one symbol */
+    int optlen = fec ? TCP_OPTLEN_FEC : 0;
     int dlen = 0;
 
     while (slen > 0) {
         dlen = slen > mss ? mss : slen;
         slen -= dlen;
 
-        skb = tcp_alloc_skb(0, dlen);
+        skb = tcp_alloc_skb(optlen, dlen);
+
+        /* ---- FEC: tag this segment as a source symbol --------------- */
+        if (fec) {
+            /* Defensive bounds: a completed block must have been flushed,
+             * so tx_filled is always < k here. Force-flush if not. */
+            if (fec->tx_filled >= fec->k) {
+                print_err("FEC: block slot overflow, forcing flush\n");
+                tcp_fec_emit_block(&tsk->sk, fec, fec->tx_filled,
+                                   fec->tx_tail_len);
+            }
+
+            /* First symbol pins the block's base data sequence number, so the
+             * receiver can map recovered symbol i to base_seq + i*sym_len. */
+            if (fec->tx_filled == 0)
+                fec->tx_base_seq = tsk->tcb.snd_nxt;
+
+            th = tcp_hdr(skb);
+            tcp_write_fec_option(th, FEC_SYM_SOURCE,
+                                 (uint8_t) fec->tx_filled, fec->tx_block_id);
+            th->hl = TCP_DOFFSET + (TCP_OPTLEN_FEC / 4);
+        }
+
+        /* Payload follows the option area (geometry handled by tcp_alloc_skb). */
         skb_push(skb, dlen);
         memcpy(skb->data, buf, dlen);
-        
         buf += dlen;
 
         th = tcp_hdr(skb);
         th->ack = 1;
+        if (slen == 0) th->psh = 1;
 
-        if (slen == 0) {
-            th->psh = 1;
+        /* ---- FEC: register the symbol with the encoder ------------- */
+        if (fec) {
+            const uint8_t *sym_ptr;
+
+            if (dlen == (int) fec->sym_len) {
+                /* Full symbol → zero-copy. skb->data currently points at the
+                 * payload; the buffer cannot be freed while we hold the write
+                 * lock (RX/ACK free path takes the same lock). The captured
+                 * pointer stays valid even after tcp_transmit_skb repositions
+                 * skb->data, because the bytes do not move. */
+                sym_ptr = skb->data;
+                fec->tx_tail_len = fec->sym_len;
+            } else {
+                /* Ragged tail → copy into zero-padded staging so the coding
+                 * math reads a full sym_len while only dlen bytes hit the wire.
+                 * Bounds: dlen < sym_len, slot is exactly sym_len. */
+                uint8_t *slot = fec->tx_src_buf +
+                                (size_t) fec->tx_filled * fec->sym_len;
+                memset(slot, 0, fec->sym_len);
+                memcpy(slot, skb->data, (size_t) dlen);
+                sym_ptr = slot;
+                fec->tx_tail_len = (uint16_t) dlen;
+            }
+
+            if (fec_encoder_add_source(&fec->enc, sym_ptr) != 0) {
+                print_err("FEC: encoder add_source failed\n");
+            } else {
+                fec->tx_filled++;
+            }
         }
 
         if (tcp_queue_transmit_skb(&tsk->sk, skb) == -1) {
             perror("Error on TCP skb queueing");
         }
+
+        /* ---- FEC: full block complete → generate parity synchronously,
+         * while every source skb is still queued and lock-protected. */
+        if (fec && fec->tx_filled == fec->k) {
+            if (tcp_fec_emit_block(&tsk->sk, fec, fec->k,
+                                   fec->tx_tail_len) != 0)
+                print_err("FEC: block emit failed\n");
+        }
     }
 
     tcp_rearm_user_timeout(&tsk->sk);
-    
+
     return len;
 }
 
@@ -508,6 +775,9 @@ int tcp_queue_fin(struct sock *sk)
     struct sk_buff *skb;
     struct tcphdr *th;
     int rc = 0;
+
+    /* Emit parity for any partial in-progress FEC block before teardown. */
+    tcp_fec_flush(tcp_sk(sk));
 
     skb = tcp_alloc_skb(0, 0);
     th = tcp_hdr(skb);
