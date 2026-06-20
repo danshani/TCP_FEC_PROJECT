@@ -769,12 +769,30 @@ int fcntl(int fildes, int cmd, ...)
 
         rc = transmit_lvlip(sock->lvlfd, msg, msglen);
         break;
+    case F_GETFD:
+        /* File-descriptor flags (e.g. FD_CLOEXEC) live on the real backing
+         * IPC socket fd, not on the virtual lvl-ip socket. Delegate to the
+         * real fcntl so callers such as curl that query/set CLOEXEC succeed
+         * instead of getting EINVAL. */
+        lvl_sock_dbg("Fcntl GETFD", sock);
+        rc = _fcntl(sock->lvlfd, cmd);
+        break;
+    case F_SETFD: {
+        lvl_sock_dbg("Fcntl SETFD", sock);
+
+        va_start(ap, cmd);
+        int fdflags = va_arg(ap, int);
+        va_end(ap);
+
+        rc = _fcntl(sock->lvlfd, cmd, fdflags);
+        break;
+    }
     default:
         rc = -1;
         errno = EINVAL;
         break;
     }
-    
+
     return rc;
 }
 
