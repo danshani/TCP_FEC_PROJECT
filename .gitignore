@@ -8,7 +8,15 @@ tests/venv
 vgcore*
 build/fec-selftest
 build/fec-codec-selftest
+build/handshake-selftest
+build/fec-receiver-selftest
+build/fec-sim
+build/libfecsim.so
 apps/curl/curl
 apps/curl-poll/curl-poll
 tools/liblevelip.so
 lvl-ip-test.log
+
+# editor / agent scratch
+.claude/
+*.code-workspace

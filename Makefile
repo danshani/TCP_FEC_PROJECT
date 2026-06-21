@@ -41,7 +41,7 @@ test: debug apps
 	cd tests && ./test-run-all
 
 clean:
-	rm -f build/*.o build/fec-selftest build/fec-codec-selftest build/handshake-selftest build/fec-receiver-selftest lvl-ip
+	rm -f build/*.o build/fec-selftest build/fec-codec-selftest build/handshake-selftest build/fec-receiver-selftest build/fec-sim lvl-ip
 
 fec-test: tests/fec-selftest.c src/fec.c include/fec.h
 	# Build and run the standalone GF(256) polynomial FEC self-test.
@@ -62,3 +62,11 @@ fec-receiver-test: tests/fec-receiver-selftest.c src/fec_codec.c src/fec.c inclu
 	# Build and run the receiver-side recovery self-test.
 	$(CC) $(CFLAGS) $(CPPFLAGS) tests/fec-receiver-selftest.c src/fec_codec.c src/fec.c -o build/fec-receiver-selftest
 	./build/fec-receiver-selftest
+
+fec-sim: tools/fec-sim.c src/fec_codec.c src/fec.c include/fec_codec.h include/fec.h
+	# Build the trace-driven completion-time simulator (real codec, stack RTO model).
+	# -O2 for Monte-Carlo speed; suppress two O2-only false positives in the
+	# pre-existing codec (maybe-uninitialized / alloc-size range analysis).
+	$(CC) $(CFLAGS) $(CPPFLAGS) -O2 \
+	    -Wno-maybe-uninitialized -Wno-alloc-size-larger-than \
+	    tools/fec-sim.c src/fec_codec.c src/fec.c -o build/fec-sim
