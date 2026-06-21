@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="540" viewBox="0 0 880 540" font-family="Segoe UI,Arial,sans-serif">
+<rect width="880" height="540" fill="white"/>
+<text x="440.0" y="32" text-anchor="middle" font-size="20" font-weight="bold">Completion time by FEC geometry  (loss = 2%, 256 KiB)</text>
+<line x1="90" y1="460.0" x2="670" y2="460.0" stroke="#e0e0e0" stroke-width="1"/>
+<text x="80" y="464.0" text-anchor="end" font-size="12" fill="#444">100ms</text>
+<line x1="90" y1="326.7" x2="670" y2="326.7" stroke="#e0e0e0" stroke-width="1"/>
+<text x="80" y="330.7" text-anchor="end" font-size="12" fill="#444">1s</text>
+<line x1="90" y1="193.3" x2="670" y2="193.3" stroke="#e0e0e0" stroke-width="1"/>
+<text x="80" y="197.3" text-anchor="end" font-size="12" fill="#444">10s</text>
+<line x1="90" y1="60.0" x2="670" y2="60.0" stroke="#e0e0e0" stroke-width="1"/>
+<text x="80" y="64.0" text-anchor="end" font-size="12" fill="#444">100s</text>
+<line x1="90.0" y1="460" x2="90.0" y2="465" stroke="#444"/>
+<text x="90.0" y="482.0" text-anchor="middle" font-size="12" fill="#444">k=4</text>
+<line x1="283.3" y1="460" x2="283.3" y2="465" stroke="#444"/>
+<text x="283.3" y="482.0" text-anchor="middle" font-size="12" fill="#444">k=8</text>
+<line x1="476.7" y1="460" x2="476.7" y2="465" stroke="#444"/>
+<text x="476.7" y="482.0" text-anchor="middle" font-size="12" fill="#444">k=16</text>
+<line x1="670.0" y1="460" x2="670.0" y2="465" stroke="#444"/>
+<text x="670.0" y="482.0" text-anchor="middle" font-size="12" fill="#444">k=32</text>
+<line x1="90" y1="60" x2="90" y2="460" stroke="#333" stroke-width="1.5"/>
+<line x1="90" y1="460" x2="670" y2="460" stroke="#333" stroke-width="1.5"/>
+<text x="380.0" y="518" text-anchor="middle" font-size="14">Block size k  (n = k + r symbols on the wire)</text>
+<text x="28" y="260.0" text-anchor="middle" font-size="14" transform="rotate(-90 28 260.0)">Transfer completion time  (log scale)</text>
+<polyline points="90.0,187.3 283.3,187.3 476.7,187.3 670.0,187.3" fill="none" stroke="#d62728" stroke-width="2.5"/>
+<circle cx="90.0" cy="187.3" r="3.5" fill="#d62728"/>
+<circle cx="283.3" cy="187.3" r="3.5" fill="#d62728"/>
+<circle cx="476.7" cy="187.3" r="3.5" fill="#d62728"/>
+<circle cx="670.0" cy="187.3" r="3.5" fill="#d62728"/>
+<polyline points="90.0,318.2 283.3,288.7 476.7,257.2 670.0,228.1" fill="none" stroke="#1f77b4" stroke-width="2.5"/>
+<circle cx="90.0" cy="318.2" r="3.5" fill="#1f77b4"/>
+<circle cx="283.3" cy="288.7" r="3.5" fill="#1f77b4"/>
+<circle cx="476.7" cy="257.2" r="3.5" fill="#1f77b4"/>
+<circle cx="670.0" cy="228.1" r="3.5" fill="#1f77b4"/>
+<polyline points="90.0,376.3 283.3,373.0 476.7,338.3 670.0,295.0" fill="none" stroke="#2ca02c" stroke-width="2.5"/>
+<circle cx="90.0" cy="376.3" r="3.5" fill="#2ca02c"/>
+<circle cx="283.3" cy="373.0" r="3.5" fill="#2ca02c"/>
+<circle cx="476.7" cy="338.3" r="3.5" fill="#2ca02c"/>
+<circle cx="670.0" cy="295.0" r="3.5" fill="#2ca02c"/>
+<polyline points="90.0,377.3 283.3,386.9 476.7,389.7 670.0,354.4" fill="none" stroke="#9467bd" stroke-width="2.5"/>
+<circle cx="90.0" cy="377.3" r="3.5" fill="#9467bd"/>
+<circle cx="283.3" cy="386.9" r="3.5" fill="#9467bd"/>
+<circle cx="476.7" cy="389.7" r="3.5" fill="#9467bd"/>
+<circle cx="670.0" cy="354.4" r="3.5" fill="#9467bd"/>
+<polyline points="90.0,370.5 283.3,385.1 476.7,394.1 670.0,388.1" fill="none" stroke="#ff7f0e" stroke-width="2.5"/>
+<circle cx="90.0" cy="370.5" r="3.5" fill="#ff7f0e"/>
+<circle cx="283.3" cy="385.1" r="3.5" fill="#ff7f0e"/>
+<circle cx="476.7" cy="394.1" r="3.5" fill="#ff7f0e"/>
+<circle cx="670.0" cy="388.1" r="3.5" fill="#ff7f0e"/>
+<rect x="694" y="56" width="16" height="4" fill="#d62728"/>
+<text x="718" y="62" font-size="13">Plain TCP (no FEC)</text>
+<rect x="694" y="80" width="16" height="4" fill="#1f77b4"/>
+<text x="718" y="86" font-size="13">r = 1 parity</text>
+<rect x="694" y="104" width="16" height="4" fill="#2ca02c"/>
+<text x="718" y="110" font-size="13">r = 2 parity</text>
+<rect x="694" y="128" width="16" height="4" fill="#9467bd"/>
+<text x="718" y="134" font-size="13">r = 3 parity</text>
+<rect x="694" y="152" width="16" height="4" fill="#ff7f0e"/>
+<text x="718" y="158" font-size="13">r = 4 parity</text>
+</svg>

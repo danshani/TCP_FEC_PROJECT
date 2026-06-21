@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="540" viewBox="0 0 880 540" font-family="Segoe UI,Arial,sans-serif">
+<rect width="880" height="540" fill="white"/>
+<text x="440.0" y="32" text-anchor="middle" font-size="20" font-weight="bold">Completion time vs loss: FEC recovers locally, TCP waits for RTO</text>
+<line x1="90" y1="460.0" x2="670" y2="460.0" stroke="#e0e0e0" stroke-width="1"/>
+<text x="80" y="464.0" text-anchor="end" font-size="12" fill="#444">100ms</text>
+<line x1="90" y1="326.7" x2="670" y2="326.7" stroke="#e0e0e0" stroke-width="1"/>
+<text x="80" y="330.7" text-anchor="end" font-size="12" fill="#444">1s</text>
+<line x1="90" y1="193.3" x2="670" y2="193.3" stroke="#e0e0e0" stroke-width="1"/>
+<text x="80" y="197.3" text-anchor="end" font-size="12" fill="#444">10s</text>
+<line x1="90" y1="60.0" x2="670" y2="60.0" stroke="#e0e0e0" stroke-width="1"/>
+<text x="80" y="64.0" text-anchor="end" font-size="12" fill="#444">100s</text>
+<line x1="90.0" y1="460" x2="90.0" y2="465" stroke="#444"/>
+<text x="90.0" y="482.0" text-anchor="middle" font-size="12" fill="#444">0</text>
+<line x1="142.7" y1="460" x2="142.7" y2="465" stroke="#444"/>
+<text x="142.7" y="482.0" text-anchor="middle" font-size="12" fill="#444">0.25</text>
+<line x1="195.5" y1="460" x2="195.5" y2="465" stroke="#444"/>
+<text x="195.5" y="482.0" text-anchor="middle" font-size="12" fill="#444">0.5</text>
+<line x1="248.2" y1="460" x2="248.2" y2="465" stroke="#444"/>
+<text x="248.2" y="482.0" text-anchor="middle" font-size="12" fill="#444">1</text>
+<line x1="300.9" y1="460" x2="300.9" y2="465" stroke="#444"/>
+<text x="300.9" y="482.0" text-anchor="middle" font-size="12" fill="#444">1.5</text>
+<line x1="353.6" y1="460" x2="353.6" y2="465" stroke="#444"/>
+<text x="353.6" y="482.0" text-anchor="middle" font-size="12" fill="#444">2</text>
+<line x1="406.4" y1="460" x2="406.4" y2="465" stroke="#444"/>
+<text x="406.4" y="482.0" text-anchor="middle" font-size="12" fill="#444">3</text>
+<line x1="459.1" y1="460" x2="459.1" y2="465" stroke="#444"/>
+<text x="459.1" y="482.0" text-anchor="middle" font-size="12" fill="#444">4</text>
+<line x1="511.8" y1="460" x2="511.8" y2="465" stroke="#444"/>
+<text x="511.8" y="482.0" text-anchor="middle" font-size="12" fill="#444">5</text>
+<line x1="564.5" y1="460" x2="564.5" y2="465" stroke="#444"/>
+<text x="564.5" y="482.0" text-anchor="middle" font-size="12" fill="#444">6</text>
+<line x1="617.3" y1="460" x2="617.3" y2="465" stroke="#444"/>
+<text x="617.3" y="482.0" text-anchor="middle" font-size="12" fill="#444">8</text>
+<line x1="670.0" y1="460" x2="670.0" y2="465" stroke="#444"/>
+<text x="670.0" y="482.0" text-anchor="middle" font-size="12" fill="#444">10</text>
+<line x1="90" y1="60" x2="90" y2="460" stroke="#333" stroke-width="1.5"/>
+<line x1="90" y1="460" x2="670" y2="460" stroke="#333" stroke-width="1.5"/>
+<text x="380.0" y="518" text-anchor="middle" font-size="14">Packet loss rate  (%)</text>
+<text x="28" y="260.0" text-anchor="middle" font-size="14" transform="rotate(-90 28 260.0)">Transfer completion time  (log scale)</text>
+<polyline points="90.0,404.7 142.7,303.4 195.5,265.1 248.2,228.4 300.9,204.6 353.6,187.2 406.4,162.7 459.1,146.1 511.8,132.3 564.5,120.4 617.3,100.8 670.0,85.5" fill="none" stroke="#d62728" stroke-width="2.5"/>
+<circle cx="90.0" cy="404.7" r="3.5" fill="#d62728"/>
+<circle cx="142.7" cy="303.4" r="3.5" fill="#d62728"/>
+<circle cx="195.5" cy="265.1" r="3.5" fill="#d62728"/>
+<circle cx="248.2" cy="228.4" r="3.5" fill="#d62728"/>
+<circle cx="300.9" cy="204.6" r="3.5" fill="#d62728"/>
+<circle cx="353.6" cy="187.2" r="3.5" fill="#d62728"/>
+<circle cx="406.4" cy="162.7" r="3.5" fill="#d62728"/>
+<circle cx="459.1" cy="146.1" r="3.5" fill="#d62728"/>
+<circle cx="511.8" cy="132.3" r="3.5" fill="#d62728"/>
+<circle cx="564.5" cy="120.4" r="3.5" fill="#d62728"/>
+<circle cx="617.3" cy="100.8" r="3.5" fill="#d62728"/>
+<circle cx="670.0" cy="85.5" r="3.5" fill="#d62728"/>
+<polyline points="90.0,404.7 142.7,389.4 195.5,376.0 248.2,358.3 300.9,335.6 353.6,324.6 406.4,297.0 459.1,276.3 511.8,261.9 564.5,242.7 617.3,219.4 670.0,194.9" fill="none" stroke="#7f7f7f" stroke-width="2.5"/>
+<circle cx="90.0" cy="404.7" r="3.5" fill="#7f7f7f"/>
+<circle cx="142.7" cy="389.4" r="3.5" fill="#7f7f7f"/>
+<circle cx="195.5" cy="376.0" r="3.5" fill="#7f7f7f"/>
+<circle cx="248.2" cy="358.3" r="3.5" fill="#7f7f7f"/>
+<circle cx="300.9" cy="335.6" r="3.5" fill="#7f7f7f"/>
+<circle cx="353.6" cy="324.6" r="3.5" fill="#7f7f7f"/>
+<circle cx="406.4" cy="297.0" r="3.5" fill="#7f7f7f"/>
+<circle cx="459.1" cy="276.3" r="3.5" fill="#7f7f7f"/>
+<circle cx="511.8" cy="261.9" r="3.5" fill="#7f7f7f"/>
+<circle cx="564.5" cy="242.7" r="3.5" fill="#7f7f7f"/>
+<circle cx="617.3" cy="219.4" r="3.5" fill="#7f7f7f"/>
+<circle cx="670.0" cy="194.9" r="3.5" fill="#7f7f7f"/>
+<polyline points="90.0,394.1 142.7,393.2 195.5,394.1 248.2,387.9 300.9,389.2 353.6,373.0 406.4,339.4 459.1,307.7 511.8,275.9 564.5,249.5 617.3,206.0 670.0,171.8" fill="none" stroke="#1f77b4" stroke-width="2.5"/>
+<circle cx="90.0" cy="394.1" r="3.5" fill="#1f77b4"/>
+<circle cx="142.7" cy="393.2" r="3.5" fill="#1f77b4"/>
+<circle cx="195.5" cy="394.1" r="3.5" fill="#1f77b4"/>
+<circle cx="248.2" cy="387.9" r="3.5" fill="#1f77b4"/>
+<circle cx="300.9" cy="389.2" r="3.5" fill="#1f77b4"/>
+<circle cx="353.6" cy="373.0" r="3.5" fill="#1f77b4"/>
+<circle cx="406.4" cy="339.4" r="3.5" fill="#1f77b4"/>
+<circle cx="459.1" cy="307.7" r="3.5" fill="#1f77b4"/>
+<circle cx="511.8" cy="275.9" r="3.5" fill="#1f77b4"/>
+<circle cx="564.5" cy="249.5" r="3.5" fill="#1f77b4"/>
+<circle cx="617.3" cy="206.0" r="3.5" fill="#1f77b4"/>
+<circle cx="670.0" cy="171.8" r="3.5" fill="#1f77b4"/>
+<polyline points="90.0,396.6 142.7,396.6 195.5,396.6 248.2,396.6 300.9,392.8 353.6,389.7 406.4,367.8 459.1,325.9 511.8,293.7 564.5,257.8 617.3,200.1 670.0,162.2" fill="none" stroke="#2ca02c" stroke-width="2.5"/>
+<circle cx="90.0" cy="396.6" r="3.5" fill="#2ca02c"/>
+<circle cx="142.7" cy="396.6" r="3.5" fill="#2ca02c"/>
+<circle cx="195.5" cy="396.6" r="3.5" fill="#2ca02c"/>
+<circle cx="248.2" cy="396.6" r="3.5" fill="#2ca02c"/>
+<circle cx="300.9" cy="392.8" r="3.5" fill="#2ca02c"/>
+<circle cx="353.6" cy="389.7" r="3.5" fill="#2ca02c"/>
+<circle cx="406.4" cy="367.8" r="3.5" fill="#2ca02c"/>
+<circle cx="459.1" cy="325.9" r="3.5" fill="#2ca02c"/>
+<circle cx="511.8" cy="293.7" r="3.5" fill="#2ca02c"/>
+<circle cx="564.5" cy="257.8" r="3.5" fill="#2ca02c"/>
+<circle cx="617.3" cy="200.1" r="3.5" fill="#2ca02c"/>
+<circle cx="670.0" cy="162.2" r="3.5" fill="#2ca02c"/>
+<polyline points="90.0,399.2 142.7,397.7 195.5,399.2 248.2,391.6 300.9,367.3 353.6,338.3 406.4,295.1 459.1,253.4 511.8,223.1 564.5,193.7 617.3,153.6 670.0,123.8" fill="none" stroke="#9467bd" stroke-width="2.5"/>
+<circle cx="90.0" cy="399.2" r="3.5" fill="#9467bd"/>
+<circle cx="142.7" cy="397.7" r="3.5" fill="#9467bd"/>
+<circle cx="195.5" cy="399.2" r="3.5" fill="#9467bd"/>
+<circle cx="248.2" cy="391.6" r="3.5" fill="#9467bd"/>
+<circle cx="300.9" cy="367.3" r="3.5" fill="#9467bd"/>
+<circle cx="353.6" cy="338.3" r="3.5" fill="#9467bd"/>
+<circle cx="406.4" cy="295.1" r="3.5" fill="#9467bd"/>
+<circle cx="459.1" cy="253.4" r="3.5" fill="#9467bd"/>
+<circle cx="511.8" cy="223.1" r="3.5" fill="#9467bd"/>
+<circle cx="564.5" cy="193.7" r="3.5" fill="#9467bd"/>
+<circle cx="617.3" cy="153.6" r="3.5" fill="#9467bd"/>
+<circle cx="670.0" cy="123.8" r="3.5" fill="#9467bd"/>
+<rect x="694" y="56" width="16" height="4" fill="#d62728"/>
+<text x="718" y="62" font-size="13">Plain TCP (RTO-only, this stack)</text>
+<rect x="694" y="80" width="16" height="4" fill="#7f7f7f"/>
+<text x="718" y="86" font-size="13">Idealised TCP (fast-retransmit)</text>
+<rect x="694" y="104" width="16" height="4" fill="#1f77b4"/>
+<text x="718" y="110" font-size="13">FEC k=8,r=2 (25% ovh)</text>
+<rect x="694" y="128" width="16" height="4" fill="#2ca02c"/>
+<text x="718" y="134" font-size="13">FEC k=16,r=3 (18.75% ovh)</text>
+<rect x="694" y="152" width="16" height="4" fill="#9467bd"/>
+<text x="718" y="158" font-size="13">FEC k=16,r=2 (12.5% ovh)</text>
+</svg>
