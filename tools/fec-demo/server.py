@@ -79,13 +79,33 @@ def rto_stall(rnd, p):
     return stall
 
 
-def fast_stall(rnd, p, is_tail):
-    if is_tail:
-        return rto_stall(rnd, p)
-    stall, cur = RTT_MS, RTO_MIN
-    while rnd.random() < p:
-        stall += cur
-        cur = min(cur * 2.0, RTO_CAP)
+def window_segments(sym):
+    """TCP window size in segments ~ the bandwidth-delay product. Using the full
+    BDP is the TCP-favouring (optimistic) choice, so it does not flatter FEC."""
+    return max(1, int(RATE_BPS * (RTT_MS / 1000.0) / 8.0 / sym))
+
+
+def sack_stall(rnd, lost_idx, S, p, W):
+    """Idealised TCP with SACK fast-recovery: all the holes in one RTT-window are
+    retransmitted together in ~1 RTT (not one RTT per loss). A re-lost hole costs
+    another recovery round; the final few segments can't trigger three duplicate
+    ACKs, so a tail loss waits for a full RTO."""
+    if not lost_idx:
+        return 0.0
+    by_win = {}
+    for i in lost_idx:
+        by_win.setdefault(i // W, []).append(i)
+    stall = 0.0
+    for idxs in by_win.values():
+        stall += RTT_MS                              # one fast-recovery round
+        remaining = len(idxs)
+        while remaining > 0:                         # retransmitted holes re-lost
+            relost = sum(1 for _ in range(remaining) if rnd.random() < p)
+            if relost:
+                stall += RTT_MS
+            remaining = relost
+    if any(i >= S - 3 for i in lost_idx):            # tail can't be fast-retx'd
+        stall += RTO_MIN - RTT_MS
     return stall
 
 
@@ -101,10 +121,12 @@ def simulate(data, k, r, sym, loss_pct, seed, want_blocks=True):
     nblocks = (S + k - 1) // k
     data = data + b"\x00" * (S * sym - len(data))   # zero-pad final segment
 
-    fec_stall = tcp_stall = tcp_fast_stall = 0.0
+    fec_stall = tcp_stall = 0.0
     lost_pkts = recovered_blocks = busted_blocks = recovered_syms = lost_syms = 0
     recover_failures = 0
     blocks = []
+    lost_src_global = []                # global indices of lost source segments
+    W = window_segments(sym)
 
     seg = 0
     for b in range(nblocks):
@@ -144,9 +166,8 @@ def simulate(data, k, r, sym, loss_pct, seed, want_blocks=True):
 
         # TCP loses the SAME source segments (fair: identical channel)
         for i in lost_src:
-            gidx = b * k + i
             tcp_stall += rto_stall(rnd, p)
-            tcp_fast_stall += fast_stall(rnd, p, gidx >= S - 3)
+            lost_src_global.append(b * k + i)
 
         if want_blocks:
             blocks.append({
@@ -156,6 +177,9 @@ def simulate(data, k, r, sym, loss_pct, seed, want_blocks=True):
             })
         seg += blk_k
 
+    # idealised TCP recovers all of this transfer's source losses with SACK
+    tcp_fast_stall = sack_stall(rnd, lost_src_global, S, p, W)
+
     serialize_tcp = S * sym / RATE_BPS * 8000.0
     serialize_fec = (S + r * nblocks) * sym / RATE_BPS * 8000.0
     overhead = (serialize_fec / serialize_tcp - 1.0) * 100.0 if serialize_tcp else 0.0
@@ -163,7 +187,8 @@ def simulate(data, k, r, sym, loss_pct, seed, want_blocks=True):
     return {
         "params": {"k": k, "r": r, "n": k + r, "sym": sym,
                    "loss_pct": loss_pct, "seed": seed,
-                   "file_bytes": int(len(data)), "segments": S, "blocks": nblocks},
+                   "file_bytes": int(len(data)), "segments": S, "blocks": nblocks,
+                   "window_segments": W},
         "totals": {
             "wire_packets_fec": S + r * nblocks,
             "wire_packets_tcp": S,
@@ -184,16 +209,25 @@ def simulate(data, k, r, sym, loss_pct, seed, want_blocks=True):
     }
 
 
-def sweep(data, k, r, sym, seed, losses):
+def sweep(data, k, r, sym, seed, losses, trials):
+    """Each loss point is the average of `trials` independent runs, so the curve
+    is smooth and monotonic instead of one-shot noise on a small file."""
     rows = []
     for i, lp in enumerate(losses):
-        res = simulate(data, k, r, sym, lp, seed + i * 7919, want_blocks=False)
+        afec = arto = afast = abust = 0.0
+        for t in range(trials):
+            res = simulate(data, k, r, sym, lp,
+                           seed + i * 7919 + t * 104729, want_blocks=False)
+            afec += res["timing_ms"]["fec"]
+            arto += res["timing_ms"]["tcp_rto"]
+            afast += res["timing_ms"]["tcp_fast"]
+            abust += res["totals"]["busted_blocks"]
         rows.append({"loss_pct": lp,
-                     "fec": res["timing_ms"]["fec"],
-                     "tcp_rto": res["timing_ms"]["tcp_rto"],
-                     "tcp_fast": res["timing_ms"]["tcp_fast"],
-                     "busted_blocks": res["totals"]["busted_blocks"]})
-    return {"params": {"k": k, "r": r, "sym": sym}, "rows": rows}
+                     "fec": round(afec / trials, 1),
+                     "tcp_rto": round(arto / trials, 1),
+                     "tcp_fast": round(afast / trials, 1),
+                     "busted_blocks": round(abust / trials, 2)})
+    return {"params": {"k": k, "r": r, "sym": sym, "trials": trials}, "rows": rows}
 
 
 # ------------------------------------------------------------------ http layer
@@ -255,7 +289,8 @@ class Handler(BaseHTTPRequestHandler):
                 out = simulate(data, k, r, sym, loss, seed)
             elif u.path == "/api/sweep":
                 losses = [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10]
-                out = sweep(data, k, r, sym, seed, losses)
+                trials = clamp(int(q.get("trials", ["200"])[0]), 1, 500)
+                out = sweep(data, k, r, sym, seed, losses, trials)
             else:
                 return self._send(404, "not found", "text/plain")
         except Exception as e:            # surface codec/param errors to the UI

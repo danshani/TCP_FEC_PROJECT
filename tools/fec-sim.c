@@ -26,6 +26,11 @@
  *               (1000, 2000, ... until a retransmit gets through). Head-of-line
  *               blocking makes these stalls additive to completion time.
  *
+ *   idealised : a second, tougher baseline (column t_tcp_fast_ms) — production
+ *   TCP        TCP with SACK fast-recovery: all the holes within one RTT-window
+ *               are retransmitted together in ~1 RTT (not one RTT per loss). See
+ *               sack_stall().
+ *
  *   FEC       : segments are grouped into blocks of k; r parity symbols are
  *               added (extra wire bytes -> r/k bandwidth overhead). A block of
  *               n=k+r symbols survives iff it loses <= r symbols (received>=k),
@@ -87,25 +92,42 @@ static double rto_stall(double p, double rto_min, double rto_cap)
     return stall;
 }
 
-/*
- * Idealised-TCP stall (ms) for one lost segment, assuming fast-retransmit /
- * SACK fast-recovery (which Level-IP does NOT have, but production TCP does).
- * An isolated loss is detected by duplicate ACKs and retransmitted in ~1 RTT.
- * Tail losses (no following segments to trigger dup ACKs) and a lost
- * retransmit fall back to the RTO chain. This is the conservative baseline:
- * real SACK would batch multiple losses in a window into a single RTT.
- */
-static double fast_stall(int is_tail, double p, double rtt,
-                         double rto_min, double rto_cap)
+/* TCP window in segments ~ bandwidth-delay product (optimistic for TCP). */
+static size_t window_segments(double rate_bps, double rtt_ms, size_t sym_len)
 {
-    if (is_tail) return rto_stall(p, rto_min, rto_cap);
-    double stall = rtt;                 /* fast retransmit: ~1 RTT */
-    double cur = rto_min;
-    while (coin(p)) {                   /* the retransmit was also lost */
-        stall += cur;
-        cur *= 2.0;
-        if (cur > rto_cap) cur = rto_cap;
+    size_t w = (size_t)(rate_bps * (rtt_ms / 1000.0) / 8.0 / (double)sym_len);
+    return w < 1 ? 1 : w;
+}
+
+/*
+ * Idealised-TCP stall (ms) for a whole transfer's source losses, assuming SACK
+ * fast-recovery (which Level-IP does NOT have, but production TCP does): all the
+ * holes within one RTT-window are retransmitted together in ~1 RTT, not one RTT
+ * per loss. A re-lost hole costs another recovery round; the final few segments
+ * can't trigger three duplicate ACKs, so a tail loss waits for a full RTO.
+ * `lost` must be ascending (it is — we append in segment order).
+ */
+static double sack_stall(const size_t *lost, int nlost, size_t S, double p,
+                         size_t W, double rtt, double rto_min)
+{
+    if (nlost == 0) return 0.0;
+    double stall = 0.0;
+    int i = 0;
+    while (i < nlost) {                        /* one run = one window's holes */
+        size_t win = lost[i] / W;
+        int cnt = 0;
+        while (i < nlost && lost[i] / W == win) { cnt++; i++; }
+        stall += rtt;                          /* one fast-recovery round */
+        int remaining = cnt;
+        while (remaining > 0) {                /* retransmitted holes re-lost */
+            int relost = 0;
+            for (int t = 0; t < remaining; t++) if (coin(p)) relost++;
+            if (relost) stall += rtt;
+            remaining = relost;
+        }
     }
+    for (int j = 0; j < nlost; j++)            /* tail can't be fast-retx'd */
+        if (lost[j] + 3 >= S) { stall += rto_min - rtt; break; }
     return stall;
 }
 
@@ -149,7 +171,10 @@ int main(int argc, char **argv)
     uint8_t *srcbuf = malloc((size_t)k * sym_len);
     uint8_t *redbuf = malloc((size_t)r * sym_len);
     uint8_t *outbuf = malloc((size_t)k * sym_len);
-    if (!srcbuf || !redbuf || !outbuf) { fprintf(stderr, "oom\n"); return 1; }
+    size_t  *lost_idx = malloc(S * sizeof(size_t));   /* TCP source loss indices */
+    if (!srcbuf || !redbuf || !outbuf || !lost_idx) { fprintf(stderr, "oom\n"); return 1; }
+
+    size_t W = window_segments(rate_bps, rtt_ms, sym_len);
 
     double sum_t_tcp = 0.0, sum_t_tcp_fast = 0.0, sum_t_fec = 0.0, sum_busted = 0.0;
     long   recover_failures = 0;
@@ -166,12 +191,14 @@ int main(int argc, char **argv)
         long   busted = 0;
 
         /* ---- plain TCP (this stack): every loss is one RTO chain ----
-         * ---- idealised TCP: same losses, but fast-retransmit (~1 RTT) ---- */
+         * ---- idealised TCP: same losses, but SACK fast-recovery (per window) -- */
+        int nlost = 0;
         for (size_t i = 0; i < S; i++)
             if (coin(p)) {
-                tcp_stall      += rto_stall(p, rto_min, rto_cap);
-                tcp_fast_stall += fast_stall(i >= S - 3, p, rtt_ms, rto_min, rto_cap);
+                tcp_stall += rto_stall(p, rto_min, rto_cap);
+                lost_idx[nlost++] = i;
             }
+        tcp_fast_stall = sack_stall(lost_idx, nlost, S, p, W, rtt_ms, rto_min);
 
         /* ---- FEC: per block, real encode + erasure + real decode/verify ---- */
         for (size_t b = 0; b < nblocks; b++) {
@@ -258,6 +285,6 @@ int main(int argc, char **argv)
            k, r, sym_len, file_bytes, loss_pct, trials,
            t_tcp, t_tcp_fast, t_fec, fec_overhead_pct, busted_avg, recover_failures);
 
-    free(srcbuf); free(redbuf); free(outbuf);
+    free(srcbuf); free(redbuf); free(outbuf); free(lost_idx);
     return recover_failures ? 3 : 0;
 }
