@@ -46,7 +46,7 @@ function fmtMs(ms) {
 function qs() {
   const p = new URLSearchParams({
     k: $("k").value, r: $("r").value, sym: $("sym").value,
-    loss: $("loss").value, seed: $("seed").value,
+    loss: $("loss").value, seed: $("seed").value, trials: $("trials").value,
   });
   if (!fileBuf) p.set("size", "262144");
   return p.toString();
@@ -150,7 +150,7 @@ function showResults(data) {
   const rows = [
     ["FEC (k=" + data.params.k + ", r=" + data.params.r + ")", t.fec, "var(--rec)"],
     ["Plain TCP — RTO only (this stack)", t.tcp_rto, "var(--lost)"],
-    ["Idealised TCP — fast-retransmit", t.tcp_fast, "#8b949e"],
+    ["Idealised TCP — SACK fast-recovery", t.tcp_fast, "#8b949e"],
   ];
   $("bars").innerHTML = rows.map(([lab, ms, col]) => `
     <div class="brow">
@@ -163,8 +163,8 @@ function showResults(data) {
   let verdict = `At <b>${data.params.loss_pct}%</b> loss, FEC delivered ${fmtBytes(data.params.file_bytes)} in ` +
     `<b>${fmtMs(t.fec)}</b> — <b>${vsRto.toFixed(1)}×</b> faster than this stack's RTO-only TCP`;
   verdict += vsFast >= 1
-    ? `, and <b>${vsFast.toFixed(1)}×</b> faster than idealised fast-retransmit TCP.`
-    : `. Against idealised fast-retransmit TCP it is <b>${(1 / vsFast).toFixed(1)}× slower</b> here — ` +
+    ? `, and <b>${vsFast.toFixed(1)}×</b> faster than idealised SACK fast-recovery TCP.`
+    : `. Against idealised SACK fast-recovery TCP it is <b>${(1 / vsFast).toFixed(1)}× slower</b> here — ` +
       `loss has exceeded the block's r-symbol capacity (raise r or lower k).`;
   if (data.totals.recover_failures > 0)
     verdict += ` ⚠ ${data.totals.recover_failures} recovery byte-mismatches (codec bug!).`;
@@ -194,7 +194,7 @@ function drawChart(data) {
   const xs = rows.map(r => r.loss_pct);
   const series = [
     ["Plain TCP (RTO-only)", "#f85149", rows.map(r => r.tcp_rto)],
-    ["Idealised TCP (fast-rtx)", "#8b949e", rows.map(r => r.tcp_fast)],
+    ["Idealised TCP (SACK)", "#8b949e", rows.map(r => r.tcp_fast)],
     [`FEC k=${data.params.k},r=${data.params.r}`, "#3fb950", rows.map(r => r.fec)],
   ];
   const all = series.flatMap(s => s[2]).filter(v => v > 0);
