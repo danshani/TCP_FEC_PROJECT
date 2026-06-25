@@ -13,21 +13,24 @@ so every loss costs a full RTO).
 - **Simulator:** `tools/fec-sim.c` (+ `make fec-sim`). Bernoulli loss across a
   whole file; every block recovered by the actual decoder and byte-verified
   (`recover_fail` must be 0). Two TCP baselines: RTO-only (this stack) and
-  idealised fast-retransmit (~1 RTT/loss).
+  idealised **SACK fast-recovery** (`sack_stall()`: holes in one RTT-window
+  recovered together in ~1 RTT, window = bandwidth-delay product).
 - **Datasets/graphs:** `tools/run-fec-experiments.sh` → `results/*.csv`;
   `tools/plot_fec.py` → `results/*.svg`. `results/README.md` documents the model
-  and the headline numbers. Graph 1 = completion time by geometry (k,n) at fixed
-  loss; Graph 2 = completion time vs loss for 3 geometries + both baselines.
-  Key result: FEC is a **low-loss latency win** (huge vs RTO-only; ~2× vs
-  idealised TCP up to ~5% loss), with an honest crossover at higher loss.
+  and headline numbers. Graph 1 = time by geometry (k,n) at fixed loss; Graph 2 =
+  time vs loss for 3 geometries + both baselines; Graph 3 = "winning band"
+  (overhead vs the max loss FEC still beats SACK-TCP, per geometry).
+  Key result, two stories: **vs RTO-only** FEC is transformative everywhere;
+  **vs realistic SACK TCP** FEC is a targeted low-loss win (k=8,r=2 to ~2%
+  loss), and the crossover is engineered by geometry (bigger blocks / more `r`
+  push it higher; `r=1` never wins).
 - **Live demo:** `tools/fec-demo/` — drop any file, pick k/r/loss, watch the
   real codec rebuild lost packets live, then compare completion time and run a
-  loss-sweep graph. Backend `server.py` (stdlib http + ctypes) calls
-  `build/libfecsim.so` (shim `tools/fec-demo/fecsim_shim.c` over the real codec).
-  Run: `bash tools/fec-demo/run_demo.sh` → <http://localhost:8088>.
-  All endpoints tested; 0 recovery failures across stress runs.
-
-These files are NOT yet committed (working files on `feature/fec-receiver`).
+  loss-sweep graph (averaged over N trials so it's smooth). Backend `server.py`
+  (stdlib http + ctypes) calls `build/libfecsim.so` (shim
+  `tools/fec-demo/fecsim_shim.c` over the real codec). Same SACK model as the
+  offline simulator. Run: `bash tools/fec-demo/run_demo.sh` →
+  <http://localhost:8088>. All endpoints tested; 0 recovery failures.
 
 ---
 

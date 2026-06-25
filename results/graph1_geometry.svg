@@ -21,31 +21,31 @@
 <line x1="90" y1="460" x2="670" y2="460" stroke="#333" stroke-width="1.5"/>
 <text x="380.0" y="518" text-anchor="middle" font-size="14">Block size k  (n = k + r symbols on the wire)</text>
 <text x="28" y="260.0" text-anchor="middle" font-size="14" transform="rotate(-90 28 260.0)">Transfer completion time  (log scale)</text>
-<polyline points="90.0,187.3 283.3,187.3 476.7,187.3 670.0,187.3" fill="none" stroke="#d62728" stroke-width="2.5"/>
-<circle cx="90.0" cy="187.3" r="3.5" fill="#d62728"/>
-<circle cx="283.3" cy="187.3" r="3.5" fill="#d62728"/>
-<circle cx="476.7" cy="187.3" r="3.5" fill="#d62728"/>
-<circle cx="670.0" cy="187.3" r="3.5" fill="#d62728"/>
-<polyline points="90.0,318.2 283.3,288.7 476.7,257.2 670.0,228.1" fill="none" stroke="#1f77b4" stroke-width="2.5"/>
-<circle cx="90.0" cy="318.2" r="3.5" fill="#1f77b4"/>
-<circle cx="283.3" cy="288.7" r="3.5" fill="#1f77b4"/>
-<circle cx="476.7" cy="257.2" r="3.5" fill="#1f77b4"/>
-<circle cx="670.0" cy="228.1" r="3.5" fill="#1f77b4"/>
-<polyline points="90.0,376.3 283.3,373.0 476.7,338.3 670.0,295.0" fill="none" stroke="#2ca02c" stroke-width="2.5"/>
-<circle cx="90.0" cy="376.3" r="3.5" fill="#2ca02c"/>
-<circle cx="283.3" cy="373.0" r="3.5" fill="#2ca02c"/>
-<circle cx="476.7" cy="338.3" r="3.5" fill="#2ca02c"/>
-<circle cx="670.0" cy="295.0" r="3.5" fill="#2ca02c"/>
-<polyline points="90.0,377.3 283.3,386.9 476.7,389.7 670.0,354.4" fill="none" stroke="#9467bd" stroke-width="2.5"/>
-<circle cx="90.0" cy="377.3" r="3.5" fill="#9467bd"/>
-<circle cx="283.3" cy="386.9" r="3.5" fill="#9467bd"/>
-<circle cx="476.7" cy="389.7" r="3.5" fill="#9467bd"/>
-<circle cx="670.0" cy="354.4" r="3.5" fill="#9467bd"/>
-<polyline points="90.0,370.5 283.3,385.1 476.7,394.1 670.0,388.1" fill="none" stroke="#ff7f0e" stroke-width="2.5"/>
+<polyline points="90.0,187.2 283.3,187.2 476.7,187.2 670.0,187.2" fill="none" stroke="#d62728" stroke-width="2.5"/>
+<circle cx="90.0" cy="187.2" r="3.5" fill="#d62728"/>
+<circle cx="283.3" cy="187.2" r="3.5" fill="#d62728"/>
+<circle cx="476.7" cy="187.2" r="3.5" fill="#d62728"/>
+<circle cx="670.0" cy="187.2" r="3.5" fill="#d62728"/>
+<polyline points="90.0,320.6 283.3,290.6 476.7,257.4 670.0,226.5" fill="none" stroke="#1f77b4" stroke-width="2.5"/>
+<circle cx="90.0" cy="320.6" r="3.5" fill="#1f77b4"/>
+<circle cx="283.3" cy="290.6" r="3.5" fill="#1f77b4"/>
+<circle cx="476.7" cy="257.4" r="3.5" fill="#1f77b4"/>
+<circle cx="670.0" cy="226.5" r="3.5" fill="#1f77b4"/>
+<polyline points="90.0,378.0 283.3,370.7 476.7,338.1 670.0,293.5" fill="none" stroke="#2ca02c" stroke-width="2.5"/>
+<circle cx="90.0" cy="378.0" r="3.5" fill="#2ca02c"/>
+<circle cx="283.3" cy="370.7" r="3.5" fill="#2ca02c"/>
+<circle cx="476.7" cy="338.1" r="3.5" fill="#2ca02c"/>
+<circle cx="670.0" cy="293.5" r="3.5" fill="#2ca02c"/>
+<polyline points="90.0,376.6 283.3,387.7 476.7,388.0 670.0,353.5" fill="none" stroke="#9467bd" stroke-width="2.5"/>
+<circle cx="90.0" cy="376.6" r="3.5" fill="#9467bd"/>
+<circle cx="283.3" cy="387.7" r="3.5" fill="#9467bd"/>
+<circle cx="476.7" cy="388.0" r="3.5" fill="#9467bd"/>
+<circle cx="670.0" cy="353.5" r="3.5" fill="#9467bd"/>
+<polyline points="90.0,370.5 283.3,385.1 476.7,394.1 670.0,389.0" fill="none" stroke="#ff7f0e" stroke-width="2.5"/>
 <circle cx="90.0" cy="370.5" r="3.5" fill="#ff7f0e"/>
 <circle cx="283.3" cy="385.1" r="3.5" fill="#ff7f0e"/>
 <circle cx="476.7" cy="394.1" r="3.5" fill="#ff7f0e"/>
-<circle cx="670.0" cy="388.1" r="3.5" fill="#ff7f0e"/>
+<circle cx="670.0" cy="389.0" r="3.5" fill="#ff7f0e"/>
 <rect x="694" y="56" width="16" height="4" fill="#d62728"/>
 <text x="718" y="62" font-size="13">Plain TCP (no FEC)</text>
 <rect x="694" y="80" width="16" height="4" fill="#1f77b4"/>
