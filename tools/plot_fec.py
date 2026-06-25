@@ -161,7 +161,7 @@ def build_graph2():
     base.sort(key=lambda x: float(x["loss_pct"]))
     series.append({"label": "Plain TCP (RTO-only, this stack)", "color": COLORS[0],
                    "points": [(float(x["loss_pct"]), float(x["t_tcp_ms"])) for x in base]})
-    series.append({"label": "Idealised TCP (fast-retransmit)", "color": "#7f7f7f",
+    series.append({"label": "Idealised TCP (SACK fast-recovery)", "color": "#7f7f7f",
                    "points": [(float(x["loss_pct"]), float(x["t_tcp_fast_ms"])) for x in base]})
     for i, (k, rr) in enumerate(configs):
         m = [x for x in rows if int(x["k"]) == k and int(x["r"]) == rr]
@@ -179,6 +179,50 @@ def build_graph2():
                logy=True)
 
 
+# ---------------------------------------------------------------- graph 3
+def build_graph3():
+    """Scatter: bandwidth overhead vs the highest loss rate at which FEC still
+    beats idealised SACK-TCP, one point per geometry. Upper-left is better
+    (more loss tolerated for less overhead)."""
+    rows = read_rows(os.path.join(RESULTS, "graph3_winband.csv"))
+    pts = [(float(r["overhead_pct"]), float(r["crossover_high_pct"]),
+            f'k={r["k"]},r={r["r"]}') for r in rows]
+
+    W, H = 880, 540
+    L, R, T, B = 80, 40, 60, 80
+    pw, ph = W - L - R, H - T - B
+    xmax = max(p[0] for p in pts) * 1.12
+    ymax = max(p[1] for p in pts) * 1.18 or 1
+    px = lambda x: L + pw * x / xmax
+    py = lambda y: T + ph * (1 - y / ymax)
+
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+           f'viewBox="0 0 {W} {H}" font-family="Segoe UI,Arial,sans-serif">',
+           f'<rect width="{W}" height="{H}" fill="white"/>',
+           f'<text x="{W/2}" y="32" text-anchor="middle" font-size="19" '
+           f'font-weight="bold">Loss tolerated before real (SACK) TCP wins — by FEC geometry</text>']
+    for i in range(0, int(ymax) + 1):
+        y = py(i)
+        out.append(f'<line x1="{L}" y1="{y:.1f}" x2="{L+pw}" y2="{y:.1f}" stroke="#eee"/>')
+        out.append(f'<text x="{L-8}" y="{y+4:.1f}" text-anchor="end" font-size="11" fill="#555">{i}%</text>')
+    for xv in range(0, int(xmax) + 1, 10):
+        x = px(xv)
+        out.append(f'<text x="{x:.1f}" y="{T+ph+20:.1f}" text-anchor="middle" font-size="11" fill="#555">{xv}%</text>')
+    out.append(f'<line x1="{L}" y1="{T}" x2="{L}" y2="{T+ph}" stroke="#333"/>')
+    out.append(f'<line x1="{L}" y1="{T+ph}" x2="{L+pw}" y2="{T+ph}" stroke="#333"/>')
+    out.append(f'<text x="{L+pw/2}" y="{H-30}" text-anchor="middle" font-size="14">bandwidth overhead  r/k  (%)</text>')
+    out.append(f'<text x="22" y="{T+ph/2}" text-anchor="middle" font-size="14" '
+               f'transform="rotate(-90 22 {T+ph/2})">max loss FEC still beats SACK-TCP (%)</text>')
+    for x, y, lab in pts:
+        out.append(f'<circle cx="{px(x):.1f}" cy="{py(y):.1f}" r="6" fill="#2ca02c" stroke="#176117"/>')
+        out.append(f'<text x="{px(x)+10:.1f}" y="{py(y)+4:.1f}" font-size="12" fill="#222">{_esc(lab)}</text>')
+    out.append("</svg>")
+    with open(os.path.join(RESULTS, "graph3_winband.svg"), "w") as f:
+        f.write("\n".join(out))
+    print("wrote", os.path.join(RESULTS, "graph3_winband.svg"))
+
+
 if __name__ == "__main__":
     build_graph1()
     build_graph2()
+    build_graph3()
