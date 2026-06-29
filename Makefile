@@ -41,7 +41,7 @@ test: debug apps
 	cd tests && ./test-run-all
 
 clean:
-	rm -f build/*.o build/fec-selftest build/fec-codec-selftest build/handshake-selftest build/fec-receiver-selftest build/fec-sim lvl-ip
+	rm -f build/*.o build/fec-selftest build/fec-codec-selftest build/handshake-selftest build/fec-receiver-selftest build/optparse-selftest build/fec-sim lvl-ip
 
 fec-test: tests/fec-selftest.c src/fec.c include/fec.h
 	# Build and run the standalone GF(256) polynomial FEC self-test.
@@ -62,6 +62,11 @@ fec-receiver-test: tests/fec-receiver-selftest.c src/fec_codec.c src/fec.c inclu
 	# Build and run the receiver-side recovery self-test.
 	$(CC) $(CFLAGS) $(CPPFLAGS) tests/fec-receiver-selftest.c src/fec_codec.c src/fec.c -o build/fec-receiver-selftest
 	./build/fec-receiver-selftest
+
+optparse-test: tests/optparse-selftest.c src/tcp_optparse.c include/tcp_optparse.h include/fec_frame.h
+	# Build and run the standalone TCP option-parser regression test.
+	$(CC) $(CFLAGS) $(CPPFLAGS) tests/optparse-selftest.c src/tcp_optparse.c -o build/optparse-selftest
+	./build/optparse-selftest
 
 fec-sim: tools/fec-sim.c src/fec_codec.c src/fec.c include/fec_codec.h include/fec.h
 	# Build the trace-driven completion-time simulator (real codec, stack RTO model).

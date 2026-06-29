@@ -5,6 +5,7 @@
 #include "timer.h"
 #include "utils.h"
 #include "fec_frame.h"
+#include "tcp_optparse.h"   /* TCP_OPT_* kinds, struct tcp_opt_mss, option walker */
 
 #define TCP_HDR_LEN sizeof(struct tcphdr)
 #define TCP_DOFFSET sizeof(struct tcphdr) / 4
@@ -21,14 +22,6 @@
 
 #define TCP_SYN_BACKOFF 500
 #define TCP_CONN_RETRIES 3
-
-#define TCP_OPT_NOOP 1
-#define TCP_OPTLEN_MSS 4
-#define TCP_OPT_MSS 2
-#define TCP_OPT_SACK_OK 4
-#define TCP_OPT_SACK 5
-#define TCP_OPTLEN_SACK 2
-#define TCP_OPT_TS 8
 
 /* Max TCP option bytes: data offset is 4 bits → 60-byte header − 20 fixed. */
 #define TCP_OPT_MAX 40
@@ -131,12 +124,6 @@ struct tcp_options {
     uint8_t sack;
     uint8_t fec;        /* advertise FEC-permitted in this SYN */
 };
-
-struct tcp_opt_mss {
-    uint8_t kind;
-    uint8_t len;
-    uint16_t mss;
-} __attribute__((packed));
 
 struct tcpiphdr {
     uint32_t saddr;

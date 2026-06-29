@@ -6,74 +6,21 @@
 
 static int tcp_parse_opts(struct tcp_sock *tsk, struct tcphdr *th)
 {
-    uint8_t *ptr = th->data;
-    uint8_t optlen = tcp_hlen(th) - 20;
-    struct tcp_opt_mss *opt_mss = NULL;
-    uint8_t sack_seen = 0;
-    uint8_t tsopt_seen = 0;
-    uint8_t fec_seen = 0;
+    struct tcp_parsed_opts opts = { 0 };
 
-    while (optlen > 0 && optlen < 20) {
-        switch (*ptr) {
-        case TCP_OPT_MSS:
-            opt_mss = (struct tcp_opt_mss *)ptr;
-            uint16_t mss = ntohs(opt_mss->mss);
+    /* Walk the raw option area with the dependency-free, unit-tested parser,
+     * then apply the result to socket state. */
+    tcp_walk_options(th->data, tcp_hlen(th) - 20, &opts);
 
-            if (mss > 536 && mss <= 1460) {
-                tsk->smss = mss;
-            }
-
-            ptr += sizeof(struct tcp_opt_mss);
-            optlen -= 4;
-            break;
-        case TCP_OPT_NOOP:
-            ptr += 1;
-            optlen--;
-            break;
-        case TCP_OPT_SACK_OK:
-            sack_seen = 1;
-            optlen--;
-            break;
-        case TCP_OPT_TS:
-            tsopt_seen = 1;
-            optlen--;
-            break;
-        case TCP_OPT_FEC_PERM: {
-            struct tcp_opt_fec_perm *fp = (struct tcp_opt_fec_perm *) ptr;
-
-            /* Bounds: the full 8-byte option must lie within the option area.
-             * If not, the option stream is malformed — stop parsing. */
-            if (optlen < TCP_OPTLEN_FEC_PERM) {
-                optlen = 0;
-                break;
-            }
-
-            /* Engage only on EXACT geometry agreement (version, k, r, sym_len).
-             * Any mismatch leaves fec_seen = 0 ⇒ FEC stays off (never corrupts;
-             * worst case is plain TCP). */
-            if (fp->version == FEC_WIRE_VERSION &&
-                fp->k == TCP_FEC_DEFAULT_K &&
-                fp->r == TCP_FEC_DEFAULT_R &&
-                ntohs(fp->sym_len) == TCP_FEC_DEFAULT_SYM_LEN) {
-                fec_seen = 1;
-            }
-
-            ptr += TCP_OPTLEN_FEC_PERM;
-            optlen -= TCP_OPTLEN_FEC_PERM;
-            break;
-        }
-        default:
-            print_err("Unrecognized TCPOPT\n");
-            optlen--;
-            break;
-        }
+    if (opts.mss) {
+        tsk->smss = opts.mss;
     }
 
-    if (!tsopt_seen) {
+    if (!opts.ts_seen) {
         tsk->tsopt = 0;
     }
 
-    if (sack_seen && tsk->sackok) {
+    if (opts.sack_ok && tsk->sackok) {
         // There's room for 4 sack blocks without TS OPT
         if (tsk->tsopt) tsk->sacks_allowed = 3;
         else tsk->sacks_allowed = 4;
@@ -82,7 +29,7 @@ static int tcp_parse_opts(struct tcp_sock *tsk, struct tcphdr *th)
     }
 
     /* FEC engages only if we offered it AND the peer agreed on geometry. */
-    if (fec_seen && tsk->fecok) {
+    if (opts.fec_perm && tsk->fecok) {
         tsk->fecok = 1;
     } else {
         tsk->fecok = 0;
@@ -570,6 +517,16 @@ int tcp_input_state(struct sock *sk, struct tcphdr *th, struct sk_buff *skb)
     case TCP_SYN_RECEIVED:
         if (tcb->snd_una <= th->ack_seq && th->ack_seq < tcb->snd_nxt) {
             tcp_set_state(sk, TCP_ESTABLISHED);
+
+            /* Passive side: negotiation was resolved when we parsed the peer's
+             * SYN and echoed FEC-PERM on the SYN/ACK. Allocate the codec here
+             * (mirrors the active path), otherwise tsk->fecok would be set with
+             * tsk->fec still NULL — FEC silently off on this half plus a NULL
+             * deref risk. Falls through to ESTABLISHED ACK processing below. */
+            if (tsk->fecok && tcp_fec_enable(tsk) != 0) {
+                tsk->fecok = 0;
+                print_err("FEC: enable failed; continuing without FEC\n");
+            }
         } else {
             return_tcp_drop(sk, skb);
         }
