@@ -214,7 +214,7 @@ def sweep(data, k, r, sym, seed, losses, trials):
     is smooth and monotonic instead of one-shot noise on a small file."""
     rows = []
     for i, lp in enumerate(losses):
-        afec = arto = afast = abust = 0.0
+        afec = arto = afast = abust = arec = 0.0
         for t in range(trials):
             res = simulate(data, k, r, sym, lp,
                            seed + i * 7919 + t * 104729, want_blocks=False)
@@ -222,12 +222,45 @@ def sweep(data, k, r, sym, seed, losses, trials):
             arto += res["timing_ms"]["tcp_rto"]
             afast += res["timing_ms"]["tcp_fast"]
             abust += res["totals"]["busted_blocks"]
+            nb = res["params"]["blocks"]                 # % of blocks NOT busted
+            arec += 100.0 * (nb - res["totals"]["busted_blocks"]) / nb if nb else 100.0
         rows.append({"loss_pct": lp,
                      "fec": round(afec / trials, 1),
                      "tcp_rto": round(arto / trials, 1),
                      "tcp_fast": round(afast / trials, 1),
-                     "busted_blocks": round(abust / trials, 2)})
+                     "busted_blocks": round(abust / trials, 2),
+                     "recovered_pct": round(arec / trials, 2)})
     return {"params": {"k": k, "r": r, "sym": sym, "trials": trials}, "rows": rows}
+
+
+# Geometries compared in the "choosing k & r" view, spread across bandwidth
+# overhead (r/k) and block size so both the optimal region and the
+# overhead/loss frontier are visible.
+GEOM_SET = [(16, 1), (8, 1), (16, 3), (8, 2), (8, 3), (8, 4)]
+GEOM_LOSSES = [0, 0.5, 1, 2, 3, 4, 5, 6, 8]
+
+
+def geometry(data, sym, seed, trials):
+    """For each (k, r): sweep loss and record FEC completion time, bandwidth
+    overhead (r/k), and the highest loss at which FEC still beats idealised
+    SACK-TCP. The idealised-TCP line is geometry-independent, so it is reported
+    once as a shared baseline."""
+    geoms, tcp_fast = [], None
+    for (k, r) in GEOM_SET:
+        rows = sweep(data, k, r, sym, seed, GEOM_LOSSES, trials)["rows"]
+        win_hi = 0.0
+        for row in rows:                      # highest loss where FEC still wins
+            if row["fec"] <= row["tcp_fast"]:
+                win_hi = row["loss_pct"]
+        geoms.append({"k": k, "r": r, "n": k + r,
+                      "overhead_pct": round(r / k * 100.0, 1),
+                      "win_high_pct": win_hi,
+                      "fec": [row["fec"] for row in rows],
+                      "recovered_pct": [row["recovered_pct"] for row in rows]})
+        if tcp_fast is None:
+            tcp_fast = [row["tcp_fast"] for row in rows]
+    return {"params": {"sym": sym, "trials": trials, "seed": seed},
+            "losses": GEOM_LOSSES, "tcp_fast": tcp_fast, "geoms": geoms}
 
 
 # ------------------------------------------------------------------ http layer
@@ -291,6 +324,9 @@ class Handler(BaseHTTPRequestHandler):
                 losses = [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10]
                 trials = clamp(int(q.get("trials", ["200"])[0]), 1, 500)
                 out = sweep(data, k, r, sym, seed, losses, trials)
+            elif u.path == "/api/geometry":
+                trials = clamp(int(q.get("trials", ["40"])[0]), 1, 200)
+                out = geometry(data, sym, seed, trials)
             else:
                 return self._send(404, "not found", "text/plain")
         except Exception as e:            # surface codec/param errors to the UI

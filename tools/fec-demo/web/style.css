@@ -9,6 +9,8 @@ body{margin:0;background:var(--bg);color:var(--ink);
 header{padding:22px 28px 6px}
 h1{margin:0;font-size:24px}
 .sub{color:var(--mut);max-width:880px;margin:6px 0 0}
+.note{color:var(--mut);font-size:12px;margin:2px 0 12px;line-height:1.5;max-width:880px}
+.subh{font-size:14px;font-weight:600;margin:18px 0 6px;color:var(--ink)}
 main{padding:14px 28px 40px;display:flex;flex-direction:column;gap:16px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
 h2{margin:0 0 12px;font-size:16px;font-weight:600}

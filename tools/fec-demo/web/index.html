@@ -29,7 +29,7 @@
     <div class="knobs">
       <label>k (source / block)
         <input id="k" type="number" min="1" max="128" value="8"></label>
-      <label>r (parity / block)
+      <label>r (parity = redundancy / block)
         <input id="r" type="number" min="1" max="32" value="2"></label>
       <label>symbol bytes
         <input id="sym" type="number" min="16" max="8192" step="16" value="512"></label>
@@ -46,11 +46,12 @@
     <div class="actions">
       <button id="run" class="primary">&#9654; Run transfer</button>
       <button id="sweep">&#128202; Loss sweep &rarr; graph</button>
+      <button id="geom">&#128208; Compare k,r</button>
       <span id="status" class="status"></span>
     </div>
     <div class="legend">
       <span><i class="sw src"></i> source</span>
-      <span><i class="sw par"></i> parity</span>
+      <span><i class="sw par"></i> parity (redundancy)</span>
       <span><i class="sw lost"></i> lost</span>
       <span><i class="sw rec"></i> recovered</span>
       <span><i class="sw bust"></i> unrecoverable block</span>
@@ -83,7 +84,19 @@
 
   <section class="panel" id="sweepPanel" hidden>
     <h2>Completion time vs loss rate <small>(this file &amp; geometry)</small></h2>
+    <p id="sweepNote" class="note"></p>
     <div id="chart"></div>
+  </section>
+
+  <section class="panel" id="geomPanel" hidden>
+    <h2>Choosing k &amp; r <small>(which geometry is optimal, and the overhead/loss trade-off)</small></h2>
+    <p id="geomNote" class="note"></p>
+    <h3 class="subh">Completion time vs loss &mdash; several geometries</h3>
+    <div id="geomChart"></div>
+    <h3 class="subh">Bandwidth cost vs loss protection <small>(how much overhead buys how much loss tolerance)</small></h3>
+    <div id="overheadChart"></div>
+    <h3 class="subh">Block recovery rate vs loss <small>(the codec's raw protection)</small></h3>
+    <div id="recoveryChart"></div>
   </section>
 </main>
 
