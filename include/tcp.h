@@ -203,12 +203,17 @@ struct tcp_sack_block {
 #define TCP_FEC_RX_BLOCKS 4
 
 struct tcp_fec_block_rx {
-    uint8_t            active;
-    uint32_t           block_id;
-    uint32_t           base_seq;
-    uint16_t           tail_len;
-    struct fec_decoder dec;
-    uint8_t           *symbol_buf;   /* (k+r)*sym_len staging+recovery (lazy) */
+    uint8_t  active;
+    uint8_t  recovered;                    /* missing symbols already spliced */
+    uint8_t  blk_k;                        /* actual k for this block (0 = assume full) */
+    uint32_t block_id;
+    uint32_t base_seq;                     /* TCP seq of source symbol 0 */
+    uint16_t tail_len;                     /* real len of last source symbol */
+    uint8_t  src_present[FEC_BLK_MAX_K];
+    uint8_t  red_present[FEC_BLK_MAX_R];
+    uint8_t  src_count;
+    uint8_t  red_count;
+    uint8_t *symbol_buf;                   /* (k+r)*sym_len payload staging (lazy) */
 };
 
 struct tcp_fec {

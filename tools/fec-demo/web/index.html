@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TCP-FEC Live Demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>TCP&#8209;FEC&nbsp;&mdash; Live Erasure-Coding Demo</h1>
+  <p class="sub">Drop a file, choose <b>k</b> and <b>n=k+r</b>, set a loss rate, and watch the
+     <b>real GF(256) Reed&#8209;Solomon codec</b> reconstruct lost packets &mdash; then compare
+     completion time against TCP.</p>
+</header>
+
+<main>
+  <!-- ------------------------------------------------ controls -->
+  <section class="panel controls">
+    <div id="drop" class="drop">
+      <div class="drop-inner">
+        <div class="drop-title">Drop a file here</div>
+        <div class="drop-sub">or click to browse &mdash; or just run with random data</div>
+        <div id="fileinfo" class="fileinfo">No file: using 256&nbsp;KiB of random data</div>
+      </div>
+      <input id="file" type="file" hidden>
+    </div>
+
+    <div class="knobs">
+      <label>k (source / block)
+        <input id="k" type="number" min="1" max="128" value="8"></label>
+      <label>r (parity = redundancy / block)
+        <input id="r" type="number" min="1" max="32" value="2"></label>
+      <label>symbol bytes
+        <input id="sym" type="number" min="16" max="8192" step="16" value="512"></label>
+      <label>loss rate: <span id="lossval">2.0%</span>
+        <input id="loss" type="range" min="0" max="20" step="0.25" value="2"></label>
+      <label>seed
+        <input id="seed" type="number" value="12345"></label>
+      <label>anim speed: <span id="spdval">fast</span>
+        <input id="speed" type="range" min="1" max="100" step="1" value="70"></label>
+      <label>sweep trials (avg)
+        <input id="trials" type="number" min="1" max="500" value="200"></label>
+    </div>
+
+    <div class="actions">
+      <button id="run" class="primary">&#9654; Run transfer</button>
+      <button id="sweep">&#128202; Loss sweep &rarr; graph</button>
+      <button id="geom">&#128208; Compare k,r</button>
+      <span id="status" class="status"></span>
+    </div>
+    <div class="legend">
+      <span><i class="sw src"></i> source</span>
+      <span><i class="sw par"></i> parity (redundancy)</span>
+      <span><i class="sw lost"></i> lost</span>
+      <span><i class="sw rec"></i> recovered</span>
+      <span><i class="sw bust"></i> unrecoverable block</span>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------ live counters -->
+  <section class="cards" id="cards">
+    <div class="card"><div class="big" id="c_sent">0</div><div class="lab">packets sent</div></div>
+    <div class="card"><div class="big" id="c_lost">0</div><div class="lab">packets lost</div></div>
+    <div class="card"><div class="big" id="c_rec">0</div><div class="lab">symbols recovered by FEC</div></div>
+    <div class="card"><div class="big" id="c_bust">0</div><div class="lab">unrecoverable blocks</div></div>
+    <div class="card"><div class="big" id="c_over">0%</div><div class="lab">bandwidth overhead</div></div>
+    <div class="card"><div class="big" id="c_prog">0%</div><div class="lab">progress</div></div>
+  </section>
+  <div class="bar"><div id="progbar"></div></div>
+
+  <!-- ------------------------------------------------ block grid -->
+  <section class="panel">
+    <h2>Packets on the wire <small>(each row = one FEC block of k+r symbols)</small></h2>
+    <div id="grid" class="grid"></div>
+  </section>
+
+  <!-- ------------------------------------------------ results -->
+  <section class="panel" id="resultPanel" hidden>
+    <h2>Completion time &mdash; this transfer</h2>
+    <div id="bars" class="bars"></div>
+    <p id="verdict" class="verdict"></p>
+  </section>
+
+  <section class="panel" id="sweepPanel" hidden>
+    <h2>Completion time vs loss rate <small>(this file &amp; geometry)</small></h2>
+    <p id="sweepNote" class="note"></p>
+    <div id="chart"></div>
+  </section>
+
+  <section class="panel" id="geomPanel" hidden>
+    <h2>Choosing k &amp; r <small>(which geometry is optimal, and the overhead/loss trade-off)</small></h2>
+    <p id="geomNote" class="note"></p>
+    <h3 class="subh">Completion time vs loss &mdash; several geometries</h3>
+    <div id="geomChart"></div>
+    <h3 class="subh">Bandwidth cost vs loss protection <small>(how much overhead buys how much loss tolerance)</small></h3>
+    <div id="overheadChart"></div>
+    <h3 class="subh">Block recovery rate vs loss <small>(the codec's raw protection)</small></h3>
+    <div id="recoveryChart"></div>
+  </section>
+</main>
+
+<footer>
+  Recovery performed by <code>build/libfecsim.so</code> &rarr; <code>src/fec.c</code> +
+  <code>src/fec_codec.c</code>. Timing model: this stack's RTO (1000&nbsp;ms, RFC&nbsp;6298),
+  no fast&#8209;retransmit. See <code>results/README.md</code>.
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

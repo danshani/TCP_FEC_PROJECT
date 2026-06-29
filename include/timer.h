@@ -24,7 +24,7 @@ struct timer *timer_add(uint32_t expire, void *(*handler)(void *), void *arg);
 void timer_oneshot(uint32_t expire, void *(*handler)(void *), void *arg);
 void timer_release(struct timer *t);
 void timer_cancel(struct timer *t);
-void *timers_start();
+void *timers_start(void *arg);
 int timer_get_tick();
                    
 #endif

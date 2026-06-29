@@ -461,7 +461,7 @@ void *socket_ipc_open(void *args) {
     return NULL;
 }
 
-void *start_ipc_listener()
+void *start_ipc_listener(void *arg)
 {
     int fd, rc, datasock;
     struct sockaddr_un un;

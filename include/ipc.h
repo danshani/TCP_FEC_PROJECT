@@ -13,7 +13,7 @@
 #define ipc_dbg(msg, th)
 #endif
 
-void *start_ipc_listener();
+void *start_ipc_listener(void *arg);
 
 #define IPC_SOCKET      0x0001
 #define IPC_CONNECT     0x0002

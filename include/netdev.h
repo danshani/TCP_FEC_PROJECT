@@ -22,9 +22,9 @@ struct netdev {
     uint32_t mtu;
 };
 
-void netdev_init();
+void netdev_init(void);
 int netdev_transmit(struct sk_buff *skb, uint8_t *dst, uint16_t ethertype);
-void *netdev_rx_loop();
+void *netdev_rx_loop(void *arg);
 void free_netdev();
 struct netdev *netdev_get(uint32_t sip);
 #endif

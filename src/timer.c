@@ -166,7 +166,7 @@ void timer_cancel(struct timer *t)
     pthread_mutex_unlock(&t->lock);
 }
 
-void *timers_start()
+void *timers_start(void *arg)
 {
     while (1) {
         if (usleep(10000) != 0) {

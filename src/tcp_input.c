@@ -302,9 +302,210 @@ out:
     return rc;
 }
 
+/* ============================================================= *
+ *  FEC receive path (Priority #1, receiver half)               *
+ * ============================================================= */
+
+/*
+ * Inject a reconstructed source segment into the reassembly as if it had
+ * arrived from the wire. A synthetic skb is built with a zeroed header region
+ * (so tcp_data_dequeue reads psh = 0) and the recovered payload; feeding it to
+ * tcp_data_queue advances rcv_nxt and drains the out-of-order queue exactly
+ * like a real in-order segment. Caller holds the socket write lock.
+ */
+static void tcp_fec_splice(struct tcp_sock *tsk, uint32_t seq,
+                           const uint8_t *data, int dlen)
+{
+    int reserve = ETH_HDR_LEN + IP_HDR_LEN + TCP_HDR_LEN;
+    struct sk_buff *skb = alloc_skb(reserve + dlen);
+
+    if (!skb) return;
+
+    memcpy(skb->head + reserve, data, (size_t) dlen);
+    skb->payload = skb->head + reserve;
+    skb->seq = seq;
+    skb->dlen = dlen;
+    skb->end_seq = seq + (uint32_t) dlen;
+
+    /* th arg is unused by tcp_data_queue; the synthetic header is zeroed. */
+    tcp_data_queue(tsk, NULL, skb);
+}
+
+/* Find the RX block slot for block_id, or claim one (evicting the oldest). */
+static struct tcp_fec_block_rx *tcp_fec_rx_slot(struct tcp_fec *fec, uint32_t block_id)
+{
+    struct tcp_fec_block_rx *blk, *victim = NULL;
+
+    for (int i = 0; i < TCP_FEC_RX_BLOCKS; i++) {
+        blk = &fec->rx[i];
+        if (blk->active && blk->block_id == block_id) return blk;
+    }
+
+    for (int i = 0; i < TCP_FEC_RX_BLOCKS; i++) {
+        blk = &fec->rx[i];
+        if (!blk->active) { victim = blk; break; }
+        if (!victim || blk->block_id < victim->block_id) victim = blk;
+    }
+
+    if (!victim->symbol_buf) {
+        victim->symbol_buf = calloc((size_t)(fec->k + fec->r), fec->sym_len);
+        if (!victim->symbol_buf) return NULL;
+    }
+
+    victim->active = 1;
+    victim->recovered = 0;
+    victim->blk_k = 0;
+    victim->block_id = block_id;
+    victim->base_seq = 0;
+    victim->tail_len = 0;
+    victim->src_count = 0;
+    victim->red_count = 0;
+    memset(victim->src_present, 0, sizeof(victim->src_present));
+    memset(victim->red_present, 0, sizeof(victim->red_present));
+    return victim;
+}
+
+/*
+ * Attempt to reconstruct any missing source symbols of a block and splice
+ * them back in. No-op until the block is recoverable (>= k symbols present).
+ */
+static void tcp_fec_rx_recover(struct tcp_sock *tsk, struct tcp_fec_block_rx *blk)
+{
+    struct tcp_fec *fec = tsk->fec;
+    size_t sym = fec->sym_len;
+    int r = fec->r;
+    int k = blk->blk_k ? blk->blk_k : fec->k;   /* assume full block if unknown */
+
+    if (blk->recovered) return;
+    if (k <= 0 || k > fec->k) return;           /* short/odd blocks beyond v1 -> TCP */
+
+    int present = 0;
+    for (int i = 0; i < k; i++)
+        if (blk->src_present[i]) present++;
+    int missing = k - present;
+
+    if (missing == 0) { blk->recovered = 1; return; }   /* nothing lost */
+    if (blk->red_count < missing) return;               /* not yet recoverable */
+
+    struct fec_decoder dec;
+    if (fec_decoder_init(&dec, fec->ctx, k, r, sym, NULL) != 0) return;
+
+    for (int i = 0; i < k; i++)
+        if (blk->src_present[i])
+            fec_decoder_add_source(&dec, i, blk->symbol_buf + (size_t) i * sym);
+    for (int j = 0; j < r; j++)
+        if (blk->red_present[j])
+            fec_decoder_add_redundant(&dec, j,
+                blk->symbol_buf + (size_t)(fec->k + j) * sym);
+
+    if (!fec_decoder_recoverable(&dec)) return;
+
+    /* Reconstruct missing sources directly into their staging slots. */
+    uint8_t *out[FEC_BLK_MAX_K] = { 0 };
+    for (int i = 0; i < k; i++)
+        out[i] = blk->src_present[i] ? NULL : (blk->symbol_buf + (size_t) i * sym);
+
+    if (fec_decoder_recover(&dec, out) != 0) return;
+
+    /* Splice each recovered symbol in seq order so rcv_nxt chains forward. */
+    for (int i = 0; i < k; i++) {
+        if (blk->src_present[i]) continue;
+
+        int dlen = (int) sym;
+        if (i == k - 1 && blk->tail_len > 0 && blk->tail_len < sym)
+            dlen = blk->tail_len;
+
+        tcp_fec_splice(tsk, blk->base_seq + (uint32_t) i * sym,
+                       blk->symbol_buf + (size_t) i * sym, dlen);
+        blk->src_present[i] = 1;
+        blk->src_count++;
+    }
+
+    blk->recovered = 1;
+    tcp_send_ack(&tsk->sk);   /* advertise the advanced rcv_nxt to the sender */
+}
+
+/*
+ * Intercept FEC-tagged segments. Source segments are registered with the
+ * block decoder and then delivered normally (return 0). Repair segments are
+ * consumed (return 1) — they never enter the data stream. Returns 0 for
+ * anything not FEC-tagged so normal processing continues.
+ */
+static int tcp_fec_input(struct sock *sk, struct tcphdr *th, struct sk_buff *skb)
+{
+    struct tcp_sock *tsk = tcp_sk(sk);
+    struct tcp_fec *fec = tsk->fec;
+    struct tcp_opt_fec *opt;
+    struct tcp_fec_block_rx *blk;
+    size_t sym = fec->sym_len;
+
+    /* Our peer writes the 8-byte FEC option first and alone on coded segments. */
+    if (tcp_hlen(th) < TCP_HDR_LEN + TCP_OPTLEN_FEC) return 0;
+    if (th->data[0] != TCP_OPT_FEC || th->data[1] != TCP_OPTLEN_FEC) return 0;
+
+    opt = (struct tcp_opt_fec *) th->data;
+    blk = tcp_fec_rx_slot(fec, ntohl(opt->block_id));
+    if (!blk) return 0;   /* OOM -> fall back to plain TCP */
+
+    if (opt->type == FEC_SYM_SOURCE) {
+        int idx = opt->index;
+        if (idx < 0 || idx >= fec->k) return 0;
+
+        if (!blk->src_present[idx]) {
+            int dlen = (int) skb->dlen;
+            if (dlen > (int) sym) dlen = (int) sym;
+
+            uint8_t *slot = blk->symbol_buf + (size_t) idx * sym;
+            memset(slot, 0, sym);
+            memcpy(slot, skb->payload, (size_t) dlen);   /* payload already skips opt */
+            blk->src_present[idx] = 1;
+            blk->src_count++;
+
+            /* base_seq is derivable from any source: seq - index*sym_len. */
+            blk->base_seq = skb->seq - (uint32_t) idx * sym;
+            /* A short final source reveals the block's real size. */
+            if (dlen < (int) sym) {
+                blk->tail_len = (uint16_t) dlen;
+                blk->blk_k = (uint8_t)(idx + 1);
+            }
+        }
+
+        tcp_fec_rx_recover(tsk, blk);
+        return 0;   /* deliver the source segment as normal stream data */
+    }
+
+    if (opt->type == FEC_SYM_REPAIR) {
+        struct fec_repair_hdr *rh = (struct fec_repair_hdr *) skb->payload;
+        int idx = opt->index;
+
+        if ((int) skb->dlen < (int)(sizeof(*rh) + sym) ||
+            idx < 0 || idx >= fec->r) {
+            free_skb(skb);
+            return 1;
+        }
+
+        blk->base_seq = ntohl(rh->base_seq);
+        blk->tail_len = ntohs(rh->tail_len);
+        blk->blk_k = rh->k;
+
+        if (!blk->red_present[idx]) {
+            uint8_t *slot = blk->symbol_buf + (size_t)(fec->k + idx) * sym;
+            memcpy(slot, skb->payload + sizeof(*rh), sym);
+            blk->red_present[idx] = 1;
+            blk->red_count++;
+        }
+
+        tcp_fec_rx_recover(tsk, blk);
+        free_skb(skb);   /* repair is out-of-band, never delivered to the stream */
+        return 1;
+    }
+
+    return 0;
+}
+
 /*
  * Follows RFC793 "Segment Arrives" section closely
- */ 
+ */
 int tcp_input_state(struct sock *sk, struct tcphdr *th, struct sk_buff *skb)
 {
     struct tcp_sock *tsk = tcp_sk(sk);
@@ -319,6 +520,13 @@ int tcp_input_state(struct sock *sk, struct tcphdr *th, struct sk_buff *skb)
         return tcp_listen(tsk, skb, th);
     case TCP_SYN_SENT:
         return tcp_synsent(tsk, skb, th);
+    }
+
+    /* FEC: intercept tagged segments before the window check, so out-of-band
+     * repair segments are not rejected as out-of-window. Source segments are
+     * registered with the block decoder, then fall through to normal delivery. */
+    if (tsk->fec && tcp_fec_input(sk, th, skb)) {
+        return 0;
     }
 
     /* "Otherwise" section in RFC793 */
